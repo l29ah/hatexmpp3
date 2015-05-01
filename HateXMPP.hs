@@ -8,7 +8,6 @@ import Control.Concurrent.STM.TVar
 import Control.Exception
 import Control.Monad
 import Control.Monad.EmbedIO
-import Control.Monad.Error
 import Control.Monad.Reader
 import Data.ByteString as B
 import Data.ByteString.Lazy as BL
@@ -26,14 +25,12 @@ import System.Log.Logger
 
 type Hate = ReaderT GlobalState IO
 
-runHate x s = runReaderT x s
+runHate = runReaderT
 
 instance EmbedIO Hate where
 	type Content Hate = GlobalState
-	embed f = do
-		s <- ask
-		liftIO $ f s
-	callback action cont = runHate action cont
+	embed f = ask >>= liftIO . f
+	callback = runHate
 
 data ShowSt = SNone | SAway | SChat | SDND | SXA
 
@@ -73,8 +70,8 @@ configDir = boringDir "config" [
 				(configTVarRead server)
 				(Just (configTVarWrite server)),
 		rwf "username"
-				(configTVarReadT password)
-				(Just (configTVarWriteT password)),
+				(configTVarReadT username)
+				(Just (configTVarWriteT username)),
 		rwf "password"
 				(configTVarReadT password)
 				(Just (configTVarWriteT password)),
@@ -85,9 +82,9 @@ configDir = boringDir "config" [
 
 trimLn :: (Stringy s, Eq (StringCellChar s)) => s -> s
 trimLn s = maybe "" (\c -> if c == (S.fromChar '\n') then S.init s else s) $ S.safeLast s
-readVar :: TVar a -> ErrorT NineError Hate a
+readVar :: TVar a -> Hate a
 readVar = liftIO . atomically . readTVar
-readSVar :: (Stringy a, Eq (StringCellChar a)) => TVar a -> ErrorT NineError Hate a
+readSVar :: (Stringy a, Eq (StringCellChar a)) => TVar a -> Hate a
 readSVar = liftM trimLn . readVar
 writeVar v = liftIO . atomically . writeTVar v
 
@@ -99,6 +96,13 @@ main = do
 	priot <- newTVarIO ""
 	portt <- newTVarIO ""
 	rt <- newTVarIO ""
+	jnt <- newTVarIO ""
+	jot <- newTVarIO ""
+	jvt <- newTVarIO ""
+	mdnt <- newTVarIO ""
+	showt <- newTVarIO SNone
+	statust <- newTVarIO ""
+
 	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
 	let ncfg = Config {
 		root = (boringDir "/" [
@@ -116,12 +120,11 @@ main = do
 							tsess <- liftIO (catchXmpp =<< session serv
 									(Just (\_ -> ([scramSha1 user Nothing pass]), if res == "" then Nothing else Just res))
 									(def { sessionStreamConfiguration = def { tlsBehaviour = RequireTls } }))
-							liftIO $ B.putStrLn "fuck you"
 							liftIO $ sendPresence def tsess
 							writeVar (sess s) tsess
-							throwError $ ENotImplemented "roster"
-						else throwError $ EPermissionDenied
-					else throwError $ EPermissionDenied
+							throw $ ENotImplemented "roster"
+						else throw $ EPermissionDenied
+					else throw $ EPermissionDenied
 			},
 		addr = a,
 		monadState = GlobalState {
@@ -130,7 +133,14 @@ main = do
 				password = pt,
 				priority = priot,
 				port = portt,
-				resource = rt
+				resource = rt,
+				jiv_name = jnt,
+				jiv_os = jot,
+				jiv_version = jvt,
+				muc_default_nick = mdnt,
+				showst = showt,
+				status = statust,
+				sess = undefined
 			}
 	}
 --	runReaderT (run9PServer ncfg) (GlobalState {
