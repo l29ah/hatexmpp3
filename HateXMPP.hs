@@ -12,6 +12,7 @@ import Control.Monad.Reader
 import Data.ByteString as B
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy.Char8 as BLC
+import Data.IORef
 import Data.String.Class as S
 import Data.Text
 import Data.Text.Encoding as E
@@ -88,6 +89,28 @@ readSVar :: (Stringy a, Eq (StringCellChar a)) => TVar a -> Hate a
 readSVar = liftM trimLn . readVar
 writeVar v = liftIO . atomically . writeTVar v
 
+rootmkdir "roster" = do
+		s <- ask
+		serv <- readSVar $ server s
+		user <- readSVar $ username s
+		pass <- readSVar $ password s
+		res <- readSVar $ resource s
+		tsess <- liftIO (catchXmpp =<< session serv
+				(Just (\_ -> ([scramSha1 user Nothing pass]), if res == "" then Nothing else Just res))
+				(def {	sessionStreamConfiguration = def { tlsBehaviour = RequireTls },
+					enableRoster = True }))
+		liftIO $ sendPresence def tsess
+		writeVar (sess s) tsess
+		liftIO $ Prelude.print =<< getRoster tsess
+		throw $ ENotImplemented "roster"
+rootmkdir "test" = do
+		s <- ask
+		se <- readVar $ sess s
+		liftIO $ Prelude.print =<< getRoster se
+		liftIO $ Prelude.print "loh"
+		throw $ ENotImplemented "test"
+rootmkdir _ = throw $ EInval
+
 main = do
 	a <- getEnv "HATEXMPP_ADDRESS"
 	st <- newTVarIO ""
@@ -102,30 +125,14 @@ main = do
 	mdnt <- newTVarIO ""
 	showt <- newTVarIO SNone
 	statust <- newTVarIO ""
+	sesst <- newTVarIO undefined
 
 	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
+
+	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
+	writeIORef rootref [("config", configDir)]
 	let ncfg = Config {
-		root = (boringDir "/" [
-				("config", configDir)
-			]) {
-				create = \name perms ->
-					if isDir perms
-					then if name == "roster"
-						then do
-							s <- ask
-							serv <- readSVar $ server s
-							user <- readSVar $ username s
-							pass <- readSVar $ password s
-							res <- readSVar $ resource s
-							tsess <- liftIO (catchXmpp =<< session serv
-									(Just (\_ -> ([scramSha1 user Nothing pass]), if res == "" then Nothing else Just res))
-									(def { sessionStreamConfiguration = def { tlsBehaviour = RequireTls } }))
-							liftIO $ sendPresence def tsess
-							writeVar (sess s) tsess
-							throw $ ENotImplemented "roster"
-						else throw $ EPermissionDenied
-					else throw $ EPermissionDenied
-			},
+		root = rootdir,
 		addr = a,
 		monadState = GlobalState {
 				server = st,
@@ -140,7 +147,7 @@ main = do
 				muc_default_nick = mdnt,
 				showst = showt,
 				status = statust,
-				sess = undefined
+				sess = sesst
 			}
 	}
 --	runReaderT (run9PServer ncfg) (GlobalState {
