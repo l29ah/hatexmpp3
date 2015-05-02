@@ -13,8 +13,9 @@ import Data.ByteString as B
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy.Char8 as BLC
 import Data.IORef
+import Data.Maybe
 import Data.String.Class as S
-import Data.Text
+import Data.Text as T
 import Data.Text.Encoding as E
 import Network.NineP
 import Network.NineP.Error
@@ -85,9 +86,41 @@ trimLn :: (Stringy s, Eq (StringCellChar s)) => s -> s
 trimLn s = maybe "" (\c -> if c == (S.fromChar '\n') then S.init s else s) $ S.safeLast s
 readVar :: TVar a -> Hate a
 readVar = liftIO . atomically . readTVar
+readVarH :: (GlobalState -> IO a) -> Hate a
+readVarH acc = do
+	s <- ask
+	liftIO $ acc s
 readSVar :: (Stringy a, Eq (StringCellChar a)) => TVar a -> Hate a
 readSVar = liftM trimLn . readVar
 writeVar v = liftIO . atomically . writeTVar v
+
+rosterItem jid = boringFile jid
+
+rosterDir :: NineFile Hate
+rosterDir = (boringDir "roster" []) {
+		getFiles = do
+			s <- ask
+			se <- readVar $ sess s
+			roster <- liftIO $ getRoster se
+			return []
+	}
+
+mucsmkdir name = do
+	se <- readVarH (readTVarIO . sess)
+	nick <- readVarH (readTVarIO . muc_default_nick)
+	let barejid = fromMaybe (throw EInval) $ jidFromText $ T.pack name
+	let (localp, domainp, _) = jidToTexts barejid
+	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ T.pack nick)
+	liftIO $ sendPresence (presTo presence jid) se
+	throw $ ENotImplemented "mucmkdir"
+
+mucsDir :: NineFile Hate
+mucsDir = (boringDir "mucs" []) {
+		getFiles = do
+			liftIO $ Prelude.putStrLn "lolz"
+			return [],
+		create = \name perms -> if isDir perms then mucsmkdir name else throw EInval
+	}
 
 rootmkdir "roster" = do
 		s <- ask
@@ -102,7 +135,8 @@ rootmkdir "roster" = do
 		liftIO $ sendPresence def tsess
 		writeVar (sess s) tsess
 		liftIO $ Prelude.print =<< getRoster tsess
-		throw $ ENotImplemented "roster"
+		--throw $ ENotImplemented "roster"
+		return rosterDir
 rootmkdir "test" = do
 		s <- ask
 		se <- readVar $ sess s
@@ -111,30 +145,22 @@ rootmkdir "test" = do
 		throw $ ENotImplemented "test"
 rootmkdir _ = throw $ EInval
 
-main = do
-	a <- getEnv "HATEXMPP_ADDRESS"
+initState = do
 	st <- newTVarIO ""
 	ut <- newTVarIO ""
 	pt <- newTVarIO ""
 	priot <- newTVarIO ""
 	portt <- newTVarIO ""
 	rt <- newTVarIO ""
-	jnt <- newTVarIO ""
+	jnt <- newTVarIO "hatexmpp3"
 	jot <- newTVarIO ""
 	jvt <- newTVarIO ""
-	mdnt <- newTVarIO ""
+	mdnt <- newTVarIO "hatexmpp3"
 	showt <- newTVarIO SNone
 	statust <- newTVarIO ""
 	sesst <- newTVarIO undefined
 
-	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
-
-	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
-	writeIORef rootref [("config", configDir)]
-	let ncfg = Config {
-		root = rootdir,
-		addr = a,
-		monadState = GlobalState {
+	return $ GlobalState {
 				server = st,
 				username = ut,
 				password = pt,
@@ -149,10 +175,27 @@ main = do
 				status = statust,
 				sess = sesst
 			}
+
+initMain = do
+	a <- getEnv "HATEXMPP_ADDRESS"
+	state <- initState
+
+	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
+
+	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
+	writeIORef rootref [("config", configDir), ("mucs", mucsDir)]
+	let ncfg = Config {
+		root = rootdir,
+		addr = a,
+		monadState = state
 	}
---	runReaderT (run9PServer ncfg) (GlobalState {
---			server = st,
---			username = ut,
---			password = pt
---		})
-	run9PServer ncfg
+	return (state, run9PServer ncfg)
+
+ghciMain = do
+	(state, runServer) <- initMain
+	forkIO $ runServer
+	return state
+
+main = do
+	(_, runServer) <- initMain
+	runServer
