@@ -15,8 +15,9 @@ import Data.ByteString.Lazy.Char8 as BLC
 import Data.IORef
 import Data.Maybe
 import Data.String.Class as S
-import Data.Text as T
+import Data.Text as Text
 import Data.Text.Encoding as E
+import Data.XML.Types
 import Network.NineP
 import Network.NineP.Error
 import Network.NineP.File
@@ -49,8 +50,10 @@ data GlobalState = GlobalState {
 		muc_default_nick :: TVar String,
 		showst :: TVar ShowSt,
 		status :: TVar String,
+		streamManagement :: TVar Bool,
 
-		sess :: TVar Session
+		sess :: TVar Session,
+		featureStreamManagement3 :: TVar Bool
 	}
 
 catchXmpp :: Either XmppFailure Session -> IO Session
@@ -105,14 +108,25 @@ rosterDir = (boringDir "roster" []) {
 			return []
 	}
 
+readMUCChat jid = undefined
+writeMUCChat jid = do
+	undefined
+	
+
+mucChat jid = rwFile jid (Just $ readMUCChat jid) (Just $ writeMUCChat jid)
+
+muc jid = boringDir jid [("__chat", mucChat jid)]
+
 mucsmkdir name = do
 	se <- readVarH (readTVarIO . sess)
 	nick <- readVarH (readTVarIO . muc_default_nick)
-	let barejid = fromMaybe (throw EInval) $ jidFromText $ T.pack name
+	let barejid = fromMaybe (throw EInval) $ jidFromText $ Text.pack name
 	let (localp, domainp, _) = jidToTexts barejid
-	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ T.pack nick)
+	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ Text.pack nick)
 	liftIO $ sendPresence (presTo presence jid) se
-	throw $ ENotImplemented "mucmkdir"
+	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "i hate you") { messageType = GroupChat }) se
+	return $ muc name
+	--throw $ ENotImplemented "mucmkdir"
 
 mucsDir :: NineFile Hate
 mucsDir = (boringDir "mucs" []) {
@@ -122,6 +136,19 @@ mucsDir = (boringDir "mucs" []) {
 		create = \name perms -> if isDir perms then mucsmkdir name else throw EInval
 	}
 
+sendRaw :: B.ByteString -> Session -> IO (Either XmppFailure ())
+sendRaw d s = semWrite (writeSemaphore s) d
+
+processOtherFeatures :: Session -> Element -> Hate ()
+processOtherFeatures s e = do
+	s <- ask
+	forM_ (nameNamespace $ elementName e) $ \ns -> do
+		case ns of
+			"urn:xmpp:sm:3" -> do
+				-- For client-to-server connections, the client MUST NOT attempt to enable stream management until after it has completed Resource Binding unless it is resuming a previous session (see Resumption).
+				writeVar (featureStreamManagement3 s) True
+			_ -> return ()
+
 rootmkdir "roster" = do
 		s <- ask
 		serv <- readSVar $ server s
@@ -130,12 +157,32 @@ rootmkdir "roster" = do
 		res <- readSVar $ resource s
 		tsess <- liftIO (catchXmpp =<< session serv
 				(Just (\_ -> ([scramSha1 user Nothing pass]), if res == "" then Nothing else Just res))
-				(def {	sessionStreamConfiguration = def { tlsBehaviour = RequireTls },
-					enableRoster = True }))
+				(def {	sessionStreamConfiguration = def {
+						tlsBehaviour = RequireTls,
+						establishSession = False }, -- to be able to use stream management
+					enableRoster = False }))
+		features <- liftIO $ getFeatures tsess
+		mapM_ (processOtherFeatures tsess) $ streamOtherFeatures features
+		-- Enable SM
+		sme <- readVar $ streamManagement s
+		when sme $ do
+			smf <- readVar $ featureStreamManagement3 s
+			when smf $ do
+				liftIO $ sendRaw "<enable xmlns='urn:xmpp:sm:3'/>" tsess
+				-- TODO error reporting
+				--liftIO $ flip withConnection tsess $ \stream -> do
+					--e <- withStream pullElement stream
+					--print e
+					--return ((), stream)
+				liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
+				--liftIO $ Prelude.putStrLn "SM!"
+				return ()
+			-- TODO resume session
+		-- TODO startSession
+		-- TODO initRoster
 		liftIO $ sendPresence def tsess
 		writeVar (sess s) tsess
 		liftIO $ Prelude.print =<< getRoster tsess
-		--throw $ ENotImplemented "roster"
 		return rosterDir
 rootmkdir "test" = do
 		s <- ask
@@ -158,7 +205,9 @@ initState = do
 	mdnt <- newTVarIO "hatexmpp3"
 	showt <- newTVarIO SNone
 	statust <- newTVarIO ""
+	streamManagementt <- newTVarIO False
 	sesst <- newTVarIO undefined
+	featureStreamManagement3t <- newTVarIO False
 
 	return $ GlobalState {
 				server = st,
@@ -173,7 +222,9 @@ initState = do
 				muc_default_nick = mdnt,
 				showst = showt,
 				status = statust,
-				sess = sesst
+				streamManagement = streamManagementt,
+				sess = sesst,
+				featureStreamManagement3 = featureStreamManagement3t
 			}
 
 initMain = do
