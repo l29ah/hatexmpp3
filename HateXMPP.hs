@@ -21,6 +21,7 @@ import Data.XML.Types
 import Network.NineP
 import Network.NineP.Error
 import Network.NineP.File
+import Network.TLS
 import Network.Xmpp
 import Network.Xmpp.Internal hiding (priority, status)
 import System.Environment
@@ -51,6 +52,7 @@ data GlobalState = GlobalState {
 		showst :: TVar ShowSt,
 		status :: TVar String,
 		streamManagement :: TVar Bool,
+		permitUnsafeCerts :: TVar Bool,
 
 		sess :: TVar Session,
 		featureStreamManagement3 :: TVar Bool
@@ -66,6 +68,8 @@ configTVarRead acc = Just (liftM BLC.pack . liftIO . atomically . readTVar . acc
 configTVarWrite acc x = liftIO . atomically . flip writeTVar (BLC.unpack x) . acc =<< ask
 configTVarReadT acc = Just (liftM (fromChunks . (:[]) . E.encodeUtf8) . liftIO . atomically . readTVar . acc =<< ask)
 configTVarWriteT acc x = liftIO . atomically . flip writeTVar (E.decodeUtf8 $ B.concat $ toChunks $ x) . acc =<< ask
+configTVarReadC acc = Just (liftM (BLC.pack . show) . liftIO . atomically . readTVar . acc =<< ask)
+configTVarWriteC acc x = liftIO . atomically . flip writeTVar (Prelude.read $ BLC.unpack x) . acc =<< ask
 
 rwf n a b = (n, rwFile n a b)
 
@@ -82,7 +86,10 @@ configDir = boringDir "config" [
 				(Just (configTVarWriteT password)),
 		rwf "status"
 				(configTVarRead status)
-				(Just (configTVarWrite status))
+				(Just (configTVarWrite status)),
+		rwf "permit_all_certs"
+				(configTVarReadC permitUnsafeCerts)
+				(Just (configTVarWriteC permitUnsafeCerts))
 	]
 
 trimLn :: (Stringy s, Eq (StringCellChar s)) => s -> s
@@ -155,11 +162,16 @@ rootmkdir "roster" = do
 		user <- readSVar $ username s
 		pass <- readSVar $ password s
 		res <- readSVar $ resource s
+		unsafeCerts <- readVar $ permitUnsafeCerts s
 		tsess <- liftIO (catchXmpp =<< session serv
 				(Just (\_ -> ([scramSha1 user Nothing pass]), if res == "" then Nothing else Just res))
 				(def {	sessionStreamConfiguration = def {
 						tlsBehaviour = RequireTls,
-						establishSession = False }, -- to be able to use stream management
+						tlsParams = if unsafeCerts
+							then xmppDefaultParams { clientHooks = def { onServerCertificate = \_ _ _ _ -> pure [] } }
+							else xmppDefaultParams,
+						--establishSession = False }, -- to be able to use stream management
+						establishSession = True },
 					enableRoster = False }))
 		features <- liftIO $ getFeatures tsess
 		mapM_ (processOtherFeatures tsess) $ streamOtherFeatures features
@@ -206,6 +218,7 @@ initState = do
 	showt <- newTVarIO SNone
 	statust <- newTVarIO ""
 	streamManagementt <- newTVarIO False
+	permitUnsafeCertst <- newTVarIO False
 	sesst <- newTVarIO undefined
 	featureStreamManagement3t <- newTVarIO False
 
@@ -223,6 +236,7 @@ initState = do
 				showst = showt,
 				status = statust,
 				streamManagement = streamManagementt,
+				permitUnsafeCerts = permitUnsafeCertst,
 				sess = sesst,
 				featureStreamManagement3 = featureStreamManagement3t
 			}
