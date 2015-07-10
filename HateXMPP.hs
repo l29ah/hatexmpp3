@@ -27,82 +27,11 @@ import Network.Xmpp.Internal hiding (priority, status)
 import System.Environment
 import System.Log.Logger
 
-type Hate = ReaderT GlobalState IO
-
-runHate = runReaderT
-
-instance EmbedIO Hate where
-	type Content Hate = GlobalState
-	embed f = ask >>= liftIO . f
-	callback = runHate
-
-data ShowSt = SNone | SAway | SChat | SDND | SXA
-
-data GlobalState = GlobalState {
-		server :: TVar String,
-		port :: TVar String,
-		username :: TVar Text,
-		password :: TVar Text,
-		resource :: TVar Text,
-		priority :: TVar String,
-		jiv_name :: TVar String,
-		jiv_os :: TVar String,
-		jiv_version :: TVar String,
-		muc_default_nick :: TVar String,
-		showst :: TVar ShowSt,
-		status :: TVar String,
-		streamManagement :: TVar Bool,
-		permitUnsafeCerts :: TVar Bool,
-
-		sess :: TVar Session,
-		featureStreamManagement3 :: TVar Bool
-	}
+import Types
+import Config
 
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
-
---makeConfigFile :: String -> NineFile Hate
---makeConfigFile filename handler = undefined
-
-configTVarRead acc = Just (liftM BLC.pack . liftIO . atomically . readTVar . acc =<< ask)
-configTVarWrite acc x = liftIO . atomically . flip writeTVar (BLC.unpack x) . acc =<< ask
-configTVarReadT acc = Just (liftM (fromChunks . (:[]) . E.encodeUtf8) . liftIO . atomically . readTVar . acc =<< ask)
-configTVarWriteT acc x = liftIO . atomically . flip writeTVar (E.decodeUtf8 $ B.concat $ toChunks $ x) . acc =<< ask
-configTVarReadC acc = Just (liftM (BLC.pack . show) . liftIO . atomically . readTVar . acc =<< ask)
-configTVarWriteC acc x = liftIO . atomically . flip writeTVar (Prelude.read $ BLC.unpack x) . acc =<< ask
-
-rwf n a b = (n, rwFile n a b)
-
-configDir :: NineFile Hate
-configDir = boringDir "config" [
-		rwf "server"
-				(configTVarRead server)
-				(Just (configTVarWrite server)),
-		rwf "username"
-				(configTVarReadT username)
-				(Just (configTVarWriteT username)),
-		rwf "password"
-				(configTVarReadT password)
-				(Just (configTVarWriteT password)),
-		rwf "status"
-				(configTVarRead status)
-				(Just (configTVarWrite status)),
-		rwf "permit_all_certs"
-				(configTVarReadC permitUnsafeCerts)
-				(Just (configTVarWriteC permitUnsafeCerts))
-	]
-
-trimLn :: (Stringy s, Eq (StringCellChar s)) => s -> s
-trimLn s = maybe "" (\c -> if c == (S.fromChar '\n') then S.init s else s) $ S.safeLast s
-readVar :: TVar a -> Hate a
-readVar = liftIO . atomically . readTVar
-readVarH :: (GlobalState -> IO a) -> Hate a
-readVarH acc = do
-	s <- ask
-	liftIO $ acc s
-readSVar :: (Stringy a, Eq (StringCellChar a)) => TVar a -> Hate a
-readSVar = liftM trimLn . readVar
-writeVar v = liftIO . atomically . writeTVar v
 
 rosterItem jid = boringFile jid
 
@@ -130,7 +59,8 @@ mucsmkdir name = do
 	let barejid = fromMaybe (throw EInval) $ jidFromText $ Text.pack name
 	let (localp, domainp, _) = jidToTexts barejid
 	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ Text.pack nick)
-	liftIO $ sendPresence (presTo presence jid) se
+	-- TODO clear idea about how much of the history to request
+	liftIO $ sendPresence ((presTo presence jid) { presencePayload = [Element "x" [("xmlns", [ContentText "http://jabber.org/protocol/muc"])] [NodeElement $ Element "history" [("seconds", [ContentText "200"])] []]] } ) se
 	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "i hate you") { messageType = GroupChat }) se
 	return $ muc name
 	--throw $ ENotImplemented "mucmkdir"
@@ -203,43 +133,6 @@ rootmkdir "test" = do
 		liftIO $ Prelude.print "loh"
 		throw $ ENotImplemented "test"
 rootmkdir _ = throw $ EInval
-
-initState = do
-	st <- newTVarIO ""
-	ut <- newTVarIO ""
-	pt <- newTVarIO ""
-	priot <- newTVarIO ""
-	portt <- newTVarIO ""
-	rt <- newTVarIO ""
-	jnt <- newTVarIO "hatexmpp3"
-	jot <- newTVarIO ""
-	jvt <- newTVarIO ""
-	mdnt <- newTVarIO "hatexmpp3"
-	showt <- newTVarIO SNone
-	statust <- newTVarIO ""
-	streamManagementt <- newTVarIO False
-	permitUnsafeCertst <- newTVarIO False
-	sesst <- newTVarIO undefined
-	featureStreamManagement3t <- newTVarIO False
-
-	return $ GlobalState {
-				server = st,
-				username = ut,
-				password = pt,
-				priority = priot,
-				port = portt,
-				resource = rt,
-				jiv_name = jnt,
-				jiv_os = jot,
-				jiv_version = jvt,
-				muc_default_nick = mdnt,
-				showst = showt,
-				status = statust,
-				streamManagement = streamManagementt,
-				permitUnsafeCerts = permitUnsafeCertst,
-				sess = sesst,
-				featureStreamManagement3 = featureStreamManagement3t
-			}
 
 initMain = do
 	a <- getEnv "HATEXMPP_ADDRESS"
