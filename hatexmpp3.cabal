@@ -1,13 +1,14 @@
 Name:           hatexmpp3
 Version:        0
-
 License:        OtherLicense
 License-file:   LICENSE
-
-
 Build-Type:     Simple
-Cabal-Version:  >= 1.2
-Tested-With:    GHC == 7.8.4
+Cabal-Version:  >= 1.8
+Tested-With:    GHC == 7.10.1
+
+flag gtk
+        default: True
+        manual: True
 
 Executable      hatexmpp
         Main-is:        HateXMPP.hs
@@ -27,3 +28,5 @@ Executable      hatexmpp
                         string-class >= 0.1.6.4 && < 0.2,
                         xml-types >= 0.3.4 && < 0.4,
                         tls >= 1.2.18 && < 1.3
+        if flag(gtk)
+                cpp-options: -DGTK
