@@ -9,14 +9,17 @@ import Control.Exception
 import Control.Monad
 import Control.Monad.EmbedIO
 import Control.Monad.Reader
+import Control.Monad.Trans.Maybe
 import Data.ByteString as B
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy.Char8 as BLC
 import Data.IORef
+import Data.List as L
 import Data.Maybe
 import Data.String.Class as S
-import Data.Text as Text
+import Data.Text as T
 import Data.Text.Encoding as E
+import Data.Time
 import Data.XML.Types
 import Network.NineP
 import Network.NineP.Error
@@ -27,8 +30,9 @@ import Network.Xmpp.Internal hiding (priority, status)
 import System.Environment
 import System.Log.Logger
 
-import Types
 import Config
+import Log
+import Types
 
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
@@ -58,11 +62,12 @@ muc jid = boringDir jid [("__chat", mucChat jid)]
 mucsmkdir name = do
 	se <- readVarH (readTVarIO . sess)
 	nick <- readVarH (readTVarIO . muc_default_nick)
-	let barejid = fromMaybe (throw EInval) $ jidFromText $ Text.pack name
+	let barejid = fromMaybe (throw EInval) $ jidFromText $ T.pack name
 	let (localp, domainp, _) = jidToTexts barejid
-	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ Text.pack nick)
+	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ T.pack nick)
 	-- TODO clear idea about how much of the history to request
 	liftIO $ sendPresence ((presTo presence jid) { presencePayload = [Element "x" [("xmlns", [ContentText "http://jabber.org/protocol/muc"])] [NodeElement $ Element "history" [("seconds", [ContentText "200"])] []]] } ) se
+	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "Voker57: i hate you") { messageType = GroupChat }) se
 	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "i hate you") { messageType = GroupChat }) se
 	return $ muc name
 	--throw $ ENotImplemented "mucmkdir"
@@ -87,6 +92,30 @@ processOtherFeatures s e = do
 				-- For client-to-server connections, the client MUST NOT attempt to enable stream management until after it has completed Resource Binding unless it is resuming a previous session (see Resumption).
 				writeVar (featureStreamManagement3 s) True
 			_ -> return ()
+
+receiver s se = flip runHate s $ forever $ do
+		(stanza, ann) <- liftIO $ getStanza se
+		case stanza of
+			MessageS (Message id from to lang typ pld attr) -> void $ runMaybeT $ do
+					f <- MaybeT $ pure from
+					body <- MaybeT $ pure $ L.find (\Element { elementName = Name n ns pre } -> n == "body") pld
+					let l = elementNodes body
+					content <- MaybeT $ pure $ L.find (const True) l
+					text <- case content of
+						NodeContent (ContentText t) -> pure t
+						_ -> mzero
+					now <- liftIO $ getCurrentTime
+					let delayed_ts = do
+						delaye <- L.find (\Element { elementName = Name n ns pre } -> n == "delay") pld
+						stampa <- L.find (\(Name n ns pre, _) -> n == "stamp") $ elementAttributes delaye
+						content <- L.find (const True) $ snd stampa
+						t <- case content of
+							ContentText t -> pure t
+							_ -> mzero
+						parseTimeM False defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" $ T.unpack t :: Maybe UTCTime
+					let timestamp = fromMaybe now delayed_ts
+					lift $ putLog f text timestamp
+			_ -> pure ()
 
 rootmkdir "roster" = do
 		s <- ask
@@ -126,7 +155,8 @@ rootmkdir "roster" = do
 		-- TODO initRoster
 		liftIO $ sendPresence def tsess
 		writeVar (sess s) tsess
-		liftIO $ Prelude.print =<< getRoster tsess
+		--liftIO $ Prelude.print =<< getRoster tsess
+		liftIO $ forkIO $ receiver s tsess
 		return rosterDir
 rootmkdir "test" = do
 		s <- ask
@@ -140,7 +170,7 @@ initMain = do
 	a <- getEnv "HATEXMPP_ADDRESS"
 	state <- initState
 
-	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
+	--updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
 
 	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
 	writeIORef rootref [("config", configDir), ("mucs", mucsDir)]

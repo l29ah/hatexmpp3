@@ -8,6 +8,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Data.ByteString as B
 import Data.ByteString.Lazy.Char8 as BLC
+import Data.Map.Strict as MS
 import Data.String.Class as S
 import Data.Text as Text
 import Data.Text.Encoding as E
@@ -77,6 +78,7 @@ initState = do
 	permitUnsafeCertst <- newTVarIO False
 	sesst <- newTVarIO undefined
 	featureStreamManagement3t <- newTVarIO False
+	logst <- newTVarIO MS.empty
 
 	return $ GlobalState {
 				server = st,
@@ -94,5 +96,6 @@ initState = do
 				streamManagement = streamManagementt,
 				permitUnsafeCerts = permitUnsafeCertst,
 				sess = sesst,
-				featureStreamManagement3 = featureStreamManagement3t
+				featureStreamManagement3 = featureStreamManagement3t,
+				logs = logst
 			}

@@ -1,4 +1,4 @@
 dist
 *.hi
 *.o
-*.swp
+*.sw?

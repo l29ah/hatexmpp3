@@ -5,10 +5,15 @@ module Types where
 import Control.Concurrent.STM.TVar
 import Control.Monad.EmbedIO
 import Control.Monad.Reader
+import Data.Map.Strict as MS
 import Data.Text as Text
+import Data.Time.Clock
 import Network.Xmpp
 
 type Hate = ReaderT GlobalState IO
+type Msg = Text
+type Log = TVar [(UTCTime, Msg)]
+type Logs = MS.Map Jid Log
 
 runHate = runReaderT
 
@@ -36,5 +41,6 @@ data GlobalState = GlobalState {
 		permitUnsafeCerts :: TVar Bool,
 
 		sess :: TVar Session,
-		featureStreamManagement3 :: TVar Bool
+		featureStreamManagement3 :: TVar Bool,
+		logs :: TVar Logs
 	}
