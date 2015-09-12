@@ -21,7 +21,7 @@ putLog :: Jid -> Msg -> UTCTime -> Hate ()
 putLog j m t = do
 	s <- ask
 	--liftIO $ print (j, m, t)
-	liftIO $ TIO.putStr $ putTkabberLog t j "" m
+	liftIO $ TIO.putStr $ putTkabberLog $ TkabberLog t j "" m 0
 	liftIO $ atomically $ do
 		ls <- readTVar $ logs s
 		case MS.lookup j ls of
@@ -41,8 +41,18 @@ getLastLogTS j = do
 		log <- lift $ readVar logv
 		pure $ fst $ head log
 
-putTkabberLog :: UTCTime -> Jid -> Text -> Msg -> Text
-putTkabberLog ts jid nick body = T.concat [
+data TkabberLog = TkabberLog {
+		timestamp :: UTCTime,
+		jid :: Jid,
+		nick :: Text,
+		body :: Msg,
+		me :: Int
+	}
+
+--getTkabberLog :: Text -> TkabberLog
+
+putTkabberLog :: TkabberLog -> Text
+putTkabberLog (TkabberLog ts jid nick body me) = T.concat [
 		"timestamp ",
 		T.pack $ formatTime defaultTimeLocale "%Y%m%dT%H%M%S" ts,
 		" jid ",
@@ -51,7 +61,9 @@ putTkabberLog ts jid nick body = T.concat [
 		escape nick,
 		" body ",
 		escape body,
-		" me 0\n"]
+		" me ",
+		T.pack $ show me,
+		"\n"]
 	where
 		--escape t = if T.length t == 0 then "{}" else esc ' ' "\\\\ " $ esc '}' "\\}" $ esc '\n' "\\n" $ esc '\\' "\\\\" t
 		escape t = if T.length t == 0 then "{}" else L.foldl (\it c -> esc c (T.pack $ '\\':'\\':c:[]) it) (esc '\n' "\\\\n" $ esc '\\' "\\\\\\\\" t) ("{}\" $[]" :: String)

@@ -15,6 +15,7 @@ import Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy.Char8 as BLC
 import Data.IORef
 import Data.List as L
+import Data.Map
 import Data.Maybe
 import Data.String.Class as S
 import Data.Text as T
@@ -37,7 +38,13 @@ import Types
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
 
-rosterItem jid = boringFile jid
+chatFile jid = --simpleFile (T.unpack $ jidToText jid)
+	rwFile (T.unpack $ jidToText jid) (Nothing) (Nothing)
+
+rosterItem jid = (boringDir (T.unpack $ jidToText jid) []) {
+		getFiles = do
+			return [chatFile jid]
+	}
 
 rosterDir :: NineFile Hate
 rosterDir = (boringDir "roster" []) {
@@ -45,7 +52,10 @@ rosterDir = (boringDir "roster" []) {
 			s <- ask
 			se <- readVar $ sess s
 			roster <- liftIO $ getRoster se
-			return []
+			liftIO $ print $ ver roster
+			--liftIO $ print $ fmap (show . riJid) $ items roster
+			return $ fmap (rosterItem) $ keys $ items roster
+			--return []
 	}
 
 readMUCChat jid = undefined
@@ -115,7 +125,8 @@ receiver s se = flip runHate s $ forever $ do
 						parseTimeM False defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" $ T.unpack t :: Maybe UTCTime
 					let timestamp = fromMaybe now delayed_ts
 					lift $ putLog f text timestamp
-			_ -> pure ()
+			PresenceS (Presence id from to lang typ pld attr) -> liftIO $ print ("Presence", from, typ)
+			_ -> liftIO $ print stanza
 
 rootmkdir "roster" = do
 		s <- ask
@@ -153,6 +164,7 @@ rootmkdir "roster" = do
 			-- TODO resume session
 		-- TODO startSession
 		-- TODO initRoster
+		liftIO $ initRoster tsess
 		liftIO $ sendPresence def tsess
 		writeVar (sess s) tsess
 		--liftIO $ Prelude.print =<< getRoster tsess
