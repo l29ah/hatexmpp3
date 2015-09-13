@@ -13,6 +13,7 @@ import Control.Monad.Trans.Maybe
 import Data.ByteString as B
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy.Char8 as BLC
+import Data.Default
 import Data.IORef
 import Data.List as L
 import Data.Map
@@ -27,6 +28,7 @@ import Network.NineP.Error
 import Network.NineP.File
 import Network.TLS
 import Network.Xmpp
+import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Internal hiding (priority, status)
 import System.Environment
 import System.Log.Logger
@@ -76,9 +78,11 @@ mucsmkdir name = do
 	let (localp, domainp, _) = jidToTexts barejid
 	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ T.pack nick)
 	-- TODO clear idea about how much of the history to request
-	liftIO $ sendPresence ((presTo presence jid) { presencePayload = [Element "x" [("xmlns", [ContentText "http://jabber.org/protocol/muc"])] [NodeElement $ Element "history" [("seconds", [ContentText "200"])] []]] } ) se
+	liftIO $ joinMUC jid (Just $ def { mhrSeconds = Just 200 }) se
 	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "Voker57: i hate you") { messageType = GroupChat }) se
-	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "i hate you") { messageType = GroupChat }) se
+	liftIO $ sendMUC (toBare jid) "i hate you" se
+	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just "dosmot")
+	liftIO $ joinMUC jid Nothing se
 	return $ muc name
 	--throw $ ENotImplemented "mucmkdir"
 
