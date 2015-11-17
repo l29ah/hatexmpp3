@@ -22,7 +22,8 @@ import Data.String.Class as S
 import Data.Text as T
 import Data.Text.Encoding as E
 import Data.Time
-import Data.XML.Types
+import Data.XML.Types (Content(..))
+import qualified Data.XML.Types as DXT
 import Network.NineP
 import Network.NineP.Error
 import Network.NineP.File
@@ -32,6 +33,7 @@ import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Internal hiding (priority, status)
 import System.Environment
 import System.Log.Logger
+import Text.XML
 
 import Config
 import Log
@@ -80,9 +82,9 @@ mucsmkdir name = do
 	-- TODO clear idea about how much of the history to request
 	liftIO $ joinMUC jid (Just $ def { mhrSeconds = Just 200 }) se
 	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "Voker57: i hate you") { messageType = GroupChat }) se
-	liftIO $ sendMUC (toBare jid) "i hate you" se
-	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just "dosmot")
-	liftIO $ joinMUC jid Nothing se
+	--liftIO $ sendMUC (toBare jid) "i hate you" se
+	--let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just "dosmot")
+	--liftIO $ joinMUC jid Nothing se
 	return $ muc name
 	--throw $ ENotImplemented "mucmkdir"
 
@@ -97,10 +99,10 @@ mucsDir = (boringDir "mucs" []) {
 sendRaw :: B.ByteString -> Session -> IO (Either XmppFailure ())
 sendRaw d s = semWrite (writeSemaphore s) d
 
-processOtherFeatures :: Session -> Element -> Hate ()
+processOtherFeatures :: Session -> DXT.Element -> Hate ()
 processOtherFeatures s e = do
 	s <- ask
-	forM_ (nameNamespace $ elementName e) $ \ns -> do
+	forM_ (nameNamespace $ DXT.elementName e) $ \ns -> do
 		case ns of
 			"urn:xmpp:sm:3" -> do
 				-- For client-to-server connections, the client MUST NOT attempt to enable stream management until after it has completed Resource Binding unless it is resuming a previous session (see Resumption).
@@ -112,16 +114,16 @@ receiver s se = flip runHate s $ forever $ do
 		case stanza of
 			MessageS (Message id from to lang typ pld attr) -> void $ runMaybeT $ do
 					f <- MaybeT $ pure from
-					body <- MaybeT $ pure $ L.find (\Element { elementName = Name n ns pre } -> n == "body") pld
-					let l = elementNodes body
+					body <- MaybeT $ pure $ L.find (\DXT.Element { DXT.elementName = Name n ns pre } -> n == "body") pld
+					let l = DXT.elementNodes body
 					content <- MaybeT $ pure $ L.find (const True) l
 					text <- case content of
-						NodeContent (ContentText t) -> pure t
+						DXT.NodeContent (ContentText t) -> pure t
 						_ -> mzero
 					now <- liftIO $ getCurrentTime
 					let delayed_ts = do
-						delaye <- L.find (\Element { elementName = Name n ns pre } -> n == "delay") pld
-						stampa <- L.find (\(Name n ns pre, _) -> n == "stamp") $ elementAttributes delaye
+						delaye <- L.find (\DXT.Element { DXT.elementName = Name n ns pre } -> n == "delay") pld
+						stampa <- L.find (\(DXT.Name n ns pre, _) -> n == "stamp") $ DXT.elementAttributes delaye
 						content <- L.find (const True) $ snd stampa
 						t <- case content of
 							ContentText t -> pure t
@@ -129,7 +131,14 @@ receiver s se = flip runHate s $ forever $ do
 						parseTimeM False defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" $ T.unpack t :: Maybe UTCTime
 					let timestamp = fromMaybe now delayed_ts
 					lift $ putLog f text timestamp
-			PresenceS (Presence id from to lang typ pld attr) -> liftIO $ print ("Presence", from, typ)
+			PresenceS p@(Presence id from to lang typ pld attr) -> do
+				if L.null pld
+					then liftIO $ print ("simple presence", from, typ)
+					else forM_ pld $ \e -> do
+						let en = DXT.elementName e
+						if nameLocalName en == "x" && nameNamespace en == Just "http://jabber.org/protocol/muc#user"
+							then liftIO $ print ("a muc guy has changed presence", from)
+							else liftIO $ print ("unknown presence", from, typ, pld)
 			_ -> liftIO $ print stanza
 
 rootmkdir "roster" = do
@@ -150,7 +159,7 @@ rootmkdir "roster" = do
 						establishSession = True },
 					enableRoster = False }))
 		features <- liftIO $ getFeatures tsess
-		mapM_ (processOtherFeatures tsess) $ streamOtherFeatures features
+		mapM_ (processOtherFeatures tsess) $ streamFeaturesOther features
 		-- Enable SM
 		sme <- readVar $ streamManagement s
 		when sme $ do
@@ -168,6 +177,7 @@ rootmkdir "roster" = do
 			-- TODO resume session
 		-- TODO startSession
 		-- TODO initRoster
+		--liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
 		liftIO $ initRoster tsess
 		liftIO $ sendPresence def tsess
 		writeVar (sess s) tsess
