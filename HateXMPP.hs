@@ -39,6 +39,8 @@ import Config
 import Log
 import Types
 
+import Debug.Trace
+
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
 
@@ -52,12 +54,33 @@ chatFileWrite typ jid text = do
 chatFile jid = --simpleFile (T.unpack $ jidToText jid)
 	rwFile (T.unpack $ jidToText jid) (Nothing) (Just $ chatFileWrite Chat jid)
 
+avatarRead jid = do
+	s <- ask
+	se <- readVar $ sess s
+	result <- liftIO $ askvCard jid se
+	liftIO $ traceIO $ show result
+	undefined
+avatarWrite jid = undefined
+
+avatarFile jid = rwFile "avatar" (Just $ avatarRead jid) (Just $ avatarWrite jid)
+
+vcardDir jid = (boringDir "vcard" []) {
+		getFiles = do
+			return [avatarFile jid],
+		descend = \name -> do
+			--maybe (throw $ ENoFile name) (return . chatFile) $
+				--jidFromText $ T.pack name
+			return $ avatarFile jid
+	}
+
 rosterItem jid = (boringDir (T.unpack $ jidToText jid) []) {
 		getFiles = do
-			return [chatFile jid],
+			return [chatFile jid, vcardDir jid],
 		descend = \name -> do
-			maybe (throw $ ENoFile name) (return . chatFile) $
-				jidFromText $ T.pack name
+			case name of
+				"vcard" -> return $ vcardDir jid
+				_ -> maybe (throw $ ENoFile name) (return . chatFile) $
+					jidFromText $ T.pack name
 	}
 
 rosterDir :: NineFile Hate
