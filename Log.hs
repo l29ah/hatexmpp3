@@ -17,6 +17,20 @@ import Network.Xmpp.Internal hiding (priority, status)
 import Config
 import Types
 
+getLog :: Jid -> Hate [(UTCTime, Msg)]
+getLog jid = do
+	s <- ask
+	l <- liftIO $ readTVarIO $ logs s
+
+	let resourceLogs =  L.filter (\j -> toBare j == jid) $ MS.keys l
+	liftM concat $ liftIO $ atomically $ sequence $ L.map (\res -> case MS.lookup res l of
+			Nothing -> return []
+			Just logv ->
+				readTVar logv
+		) resourceLogs
+
+getLogS j = (liftM show) $ getLog j
+
 putLog :: Jid -> Msg -> UTCTime -> Hate ()
 putLog j m t = do
 	s <- ask

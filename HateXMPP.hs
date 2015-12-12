@@ -17,6 +17,7 @@ import Data.Default
 import Data.IORef
 import Data.List as L
 import Data.Map as M
+import Data.Map.Strict as MS
 import Data.Maybe
 import Data.String.Class as S
 import Data.Text as T
@@ -28,6 +29,7 @@ import Network.NineP.Error
 import Network.NineP.File
 import Network.TLS
 import Network.Xmpp
+import Network.Xmpp.Extras.IQAvatar
 import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Extras.VCardAvatar
 import Network.Xmpp.Internal hiding (priority, status)
@@ -44,6 +46,8 @@ import Debug.Trace
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
 
+chatFileRead typ jid = (liftM S.toLazyByteString) $ getLogS jid
+
 chatFileWrite typ jid text = do
 	s <- ask
 	se <- readVar $ sess s
@@ -52,17 +56,17 @@ chatFileWrite typ jid text = do
 		return $ either (throw . OtherError . show) (id) result
 
 chatFile jid = --simpleFile (T.unpack $ jidToText jid)
-	rwFile (T.unpack $ jidToText jid) (Nothing) (Just $ chatFileWrite Chat jid)
+	rwFile (T.unpack $ jidToText jid) (Just $ chatFileRead Chat jid) (Just $ chatFileWrite Chat jid)
 
-avatarRead jid = do
+vcAvatarRead jid = do
 	s <- ask
 	se <- readVar $ sess s
 	result <- liftIO $ askvCard jid se
 	liftIO $ traceIO $ show result
 	undefined
-avatarWrite jid = undefined
+vcAvatarWrite jid = undefined
 
-avatarFile jid = rwFile "avatar" (Just $ avatarRead jid) (Just $ avatarWrite jid)
+vcAvatarFile jid = rwFile "avatar" (Just $ vcAvatarRead jid) (Just $ vcAvatarWrite jid)
 
 vcardDir jid = (boringDir "vcard" []) {
 		getFiles = do
@@ -70,14 +74,25 @@ vcardDir jid = (boringDir "vcard" []) {
 		descend = \name -> do
 			--maybe (throw $ ENoFile name) (return . chatFile) $
 				--jidFromText $ T.pack name
-			return $ avatarFile jid
+			return $ vcAvatarFile jid
 	}
+
+avatarRead jid = do
+	s <- ask
+	se <- readVar $ sess s
+	result <- liftIO $ askIQAvatar jid se
+	liftIO $ traceIO $ show result
+	undefined
+avatarWrite jid = undefined
+
+avatarFile jid = rwFile "avatar" (Just $ avatarRead jid) (Just $ avatarWrite jid)
 
 rosterItem jid = (boringDir (T.unpack $ jidToText jid) []) {
 		getFiles = do
-			return [chatFile jid, vcardDir jid],
+			return [chatFile jid, vcardDir jid, avatarFile jid],
 		descend = \name -> do
 			case name of
+				"avatar" -> return $ avatarFile jid
 				"vcard" -> return $ vcardDir jid
 				_ -> maybe (throw $ ENoFile name) (return . chatFile) $
 					jidFromText $ T.pack name
@@ -234,7 +249,7 @@ initMain = do
 	a <- getEnv "HATEXMPP_ADDRESS"
 	state <- initState
 
-	--updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
+	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
 
 	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
 	writeIORef rootref [("config", configDir), ("mucs", mucsDir)]
