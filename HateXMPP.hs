@@ -207,9 +207,9 @@ rootmkdir "roster" = do
 						tlsBehaviour = RequireTls,
 						tlsParams = if unsafeCerts
 							then xmppDefaultParams { clientHooks = def { onServerCertificate = \_ _ _ _ -> pure [] } }
-							else xmppDefaultParams,
+							else xmppDefaultParams
 						--establishSession = False }, -- to be able to use stream management
-						establishSession = True },
+					},
 					enableRoster = False }))
 		features <- liftIO $ getFeatures tsess
 		mapM_ (processOtherFeatures tsess) $ streamFeaturesOther features
