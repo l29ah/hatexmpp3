@@ -39,6 +39,7 @@ import qualified Text.XML as TX
 
 import Config
 import Log
+import MUC
 import Types
 
 import Debug.Trace
@@ -135,17 +136,20 @@ mucsmkdir name = do
 	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ T.pack nick)
 	-- TODO clear idea about how much of the history to request
 	liftIO $ joinMUC jid (Just $ def { mhrSeconds = Just 200 }) se
+	addMUC barejid nick
 	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "Voker57: i hate you") { messageType = GroupChat }) se
 	--liftIO $ sendMUC (toBare jid) "i hate you" se
 	--let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just "dosmot")
-	return $ muc jid
+	return $ muc barejid
 	--throw $ ENotImplemented "mucmkdir"
 
 mucsDir :: NineFile Hate
 mucsDir = (boringDir "mucs" []) {
 		getFiles = do
-			liftIO $ Prelude.putStrLn "lolz"
-			return [],
+			s <- ask
+			se <- readVar $ sess s
+			ms <- readVar $ mucs s
+			return $ fmap (muc) $ keys ms,
 		create = \name perms -> if isDir perms then mucsmkdir name else throw EInval
 	}
 
@@ -194,6 +198,32 @@ receiver s se = flip runHate s $ forever $ do
 							else liftIO $ print ("unknown presence", from, typ, pld)
 			_ -> liftIO $ print stanza
 
+connectS tsess = do
+	s <- ask
+	features <- liftIO $ getFeatures tsess
+	mapM_ (processOtherFeatures tsess) $ streamFeaturesOther features
+	-- Enable SM
+	sme <- readVar $ streamManagement s
+	when sme $ do
+		smf <- readVar $ featureStreamManagement3 s
+		when smf $ do
+			liftIO $ sendRaw "<enable xmlns='urn:xmpp:sm:3'/>" tsess
+			-- TODO error reporting
+			--liftIO $ flip withConnection tsess $ \stream -> do
+				--e <- withStream pullElement stream
+				--print e
+				--return ((), stream)
+			liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
+			--liftIO $ Prelude.putStrLn "SM!"
+			return ()
+	-- TODO initRoster
+	--liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
+	liftIO $ initRoster tsess
+	liftIO $ sendPresence def tsess
+	writeVar (sess s) tsess
+	--liftIO $ Prelude.print =<< getRoster tsess
+	liftIO $ forkIO $ receiver s tsess
+
 rootmkdir "roster" = do
 		s <- ask
 		serv <- readSVar $ server s
@@ -203,40 +233,25 @@ rootmkdir "roster" = do
 		unsafeCerts <- readVar $ permitUnsafeCerts s
 		tsess <- liftIO (catchXmpp =<< session serv
 				(Just (\_ -> ([scramSha1 user Nothing pass]), if res == "" then Nothing else Just res))
-				(def {	sessionStreamConfiguration = def {
-						tlsBehaviour = RequireTls,
-						tlsParams = if unsafeCerts
-							then xmppDefaultParams { clientHooks = def { onServerCertificate = \_ _ _ _ -> pure [] } }
-							else xmppDefaultParams
-						--establishSession = False }, -- to be able to use stream management
-					},
-					enableRoster = False }))
-		features <- liftIO $ getFeatures tsess
-		mapM_ (processOtherFeatures tsess) $ streamFeaturesOther features
-		-- Enable SM
-		sme <- readVar $ streamManagement s
-		when sme $ do
-			smf <- readVar $ featureStreamManagement3 s
-			when smf $ do
-				liftIO $ sendRaw "<enable xmlns='urn:xmpp:sm:3'/>" tsess
-				-- TODO error reporting
-				--liftIO $ flip withConnection tsess $ \stream -> do
-					--e <- withStream pullElement stream
-					--print e
-					--return ((), stream)
-				liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
-				--liftIO $ Prelude.putStrLn "SM!"
-				return ()
-			-- TODO resume session
-		-- TODO startSession
-		-- TODO initRoster
-		--liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
-		liftIO $ initRoster tsess
-		liftIO $ sendPresence def tsess
-		writeVar (sess s) tsess
-		--liftIO $ Prelude.print =<< getRoster tsess
-		liftIO $ forkIO $ receiver s tsess
+				(def	{
+						sessionStreamConfiguration = def {
+							tlsBehaviour = RequireTls,
+							tlsParams = if unsafeCerts
+								then xmppDefaultParams { clientHooks = def { onServerCertificate = \_ _ _ _ -> pure [] } }
+								else xmppDefaultParams
+						},
+						enableRoster = False,
+						onConnectionClosed = \sess _ -> do
+							BLC.putStrLn "Disconnected. Reconnecting..."
+							_ <- reconnect' sess
+							flip runHate s $ do
+								connectS sess
+								rejoinMUCs
+							return ()
+					}))
+		connectS tsess
 		return rosterDir
+
 rootmkdir "test" = do
 		s <- ask
 		se <- readVar $ sess s

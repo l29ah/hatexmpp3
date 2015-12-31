@@ -14,6 +14,7 @@ type Hate = ReaderT GlobalState IO
 type Msg = Text
 type Log = TVar [(UTCTime, Msg)]
 type Logs = MS.Map Jid Log
+type MUCs = MS.Map Jid MUC
 
 runHate = runReaderT
 
@@ -22,7 +23,11 @@ instance EmbedIO Hate where
 	embed f = ask >>= liftIO . f
 	callback = runHate
 
-data ShowSt = SNone | SAway | SChat | SDND | SXA
+data ShowSt = SNone | SAway | SChat | SDND | SXA deriving Show
+
+data MUC = MUC
+	{ nick :: String
+	} deriving Show
 
 data GlobalState = GlobalState {
 		server :: TVar String,
@@ -42,5 +47,6 @@ data GlobalState = GlobalState {
 
 		sess :: TVar Session,
 		featureStreamManagement3 :: TVar Bool,
-		logs :: TVar Logs
+		logs :: TVar Logs,
+		mucs :: TVar MUCs
 	}

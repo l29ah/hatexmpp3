@@ -79,6 +79,7 @@ initState = do
 	sesst <- newTVarIO undefined
 	featureStreamManagement3t <- newTVarIO False
 	logst <- newTVarIO MS.empty
+	mucst <- newTVarIO MS.empty
 
 	return $ GlobalState {
 				server = st,
@@ -97,5 +98,6 @@ initState = do
 				permitUnsafeCerts = permitUnsafeCertst,
 				sess = sesst,
 				featureStreamManagement3 = featureStreamManagement3t,
-				logs = logst
+				logs = logst,
+				mucs = mucst
 			}
