@@ -124,7 +124,7 @@ writeMUCChat jid = do
 	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "i hate you") { messageType = GroupChat }) se
 	chatFileWrite GroupChat jid
 
-mucChat jid = rwFile (T.unpack $ jidToText jid) (Just $ readMUCChat jid) (Just $ writeMUCChat jid)
+mucChat jid = rwFile "__chat" (Just $ readMUCChat jid) (Just $ writeMUCChat jid)
 
 muc jid = boringDir (T.unpack $ jidToText jid) [("__chat", mucChat jid)]
 
@@ -147,9 +147,15 @@ mucsDir :: NineFile Hate
 mucsDir = (boringDir "mucs" []) {
 		getFiles = do
 			s <- ask
-			se <- readVar $ sess s
 			ms <- readVar $ mucs s
 			return $ fmap (muc) $ keys ms,
+		descend = \name -> do
+			s <- ask
+			ms <- readVar $ mucs s
+			maybe (throw $ ENoFile name) (return . muc) $ do
+				jid <- jidFromText $ T.pack name
+				M.lookup jid ms
+				return jid,
 		create = \name perms -> if isDir perms then mucsmkdir name else throw EInval
 	}
 
@@ -194,7 +200,7 @@ receiver s se = flip runHate s $ forever $ do
 					else forM_ pld $ \e -> do
 						let en = DXT.elementName e
 						if TX.nameLocalName en == "x" && TX.nameNamespace en == Just "http://jabber.org/protocol/muc#user"
-							then liftIO $ print ("a muc guy has changed presence", from)
+							then liftIO $ print ("a muc guy has changed presence", from, typ)
 							else liftIO $ print ("unknown presence", from, typ, pld)
 			_ -> liftIO $ print stanza
 
@@ -216,12 +222,10 @@ connectS tsess = do
 			liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
 			--liftIO $ Prelude.putStrLn "SM!"
 			return ()
-	-- TODO initRoster
 	--liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
 	liftIO $ initRoster tsess
 	liftIO $ sendPresence def tsess
 	writeVar (sess s) tsess
-	--liftIO $ Prelude.print =<< getRoster tsess
 	liftIO $ forkIO $ receiver s tsess
 
 rootmkdir "roster" = do
@@ -265,6 +269,7 @@ initMain = do
 	state <- initState
 
 	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
+	--updateGlobalLogger "Network.NineP" $ setLevel DEBUG
 
 	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
 	writeIORef rootref [("config", configDir), ("mucs", mucsDir)]
