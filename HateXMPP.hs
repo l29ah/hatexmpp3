@@ -118,11 +118,8 @@ rosterDir = (boringDir "roster" []) {
 				return jid
 	}
 
-readMUCChat jid = undefined
-writeMUCChat jid = do
-	--se <- readVarH (readTVarIO . sess)
-	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "i hate you") { messageType = GroupChat }) se
-	chatFileWrite GroupChat jid
+readMUCChat jid = chatFileRead GroupChat jid
+writeMUCChat jid = chatFileWrite GroupChat jid
 
 mucChat jid = rwFile "__chat" (Just $ readMUCChat jid) (Just $ writeMUCChat jid)
 
