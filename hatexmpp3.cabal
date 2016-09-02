@@ -4,7 +4,7 @@ License:        OtherLicense
 License-file:   LICENSE
 Build-Type:     Simple
 Cabal-Version:  >= 1.8
-Tested-With:    GHC == 7.10.2
+Tested-With:    GHC == 8.0.1
 
 flag gtk
         default: True
@@ -29,8 +29,8 @@ Executable      hatexmpp
                         xml-types >= 0.3.4 && < 0.4,
                         tls >= 1.2.18 && < 1.4,
                         containers >= 0.5.6.2 && < 0.6,
-                        time >= 1.5.0.1 && < 1.6,
-                        transformers >= 0.4.2.0 && < 0.5,
+                        time >= 1.5.0.1 && < 1.7,
+                        transformers >= 0.4.2.0 && < 0.6,
                         data-default >= 0.5.3 && < 0.6,
                         xml-conduit >= 1.3.1 && < 1.4
         if flag(gtk)
