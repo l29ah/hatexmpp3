@@ -11,8 +11,10 @@ import Data.Time.Clock
 import Network.Xmpp
 
 type Hate = ReaderT GlobalState IO
+type Nickname = Text
 type Msg = Text
-type Log = TVar [(UTCTime, Msg)]
+type LogEntry = (UTCTime, Maybe Nickname, Msg)
+type Log = TVar [LogEntry]
 type Logs = MS.Map Jid Log
 type MUCs = MS.Map Jid MUC
 

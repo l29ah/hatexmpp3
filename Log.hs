@@ -6,7 +6,9 @@ import Control.Concurrent.STM
 import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 import Data.Map.Strict as MS
+import Data.Maybe
 import Data.List as L
+import Data.String.Class as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.IO as TIO
@@ -17,22 +19,30 @@ import Network.Xmpp.Internal hiding (priority, status)
 import Config
 import Types
 
-getLog :: Jid -> Hate [(UTCTime, Msg)]
+getLog :: Jid -> Hate [LogEntry]
 getLog jid = do
 	s <- ask
 	l <- liftIO $ readTVarIO $ logs s
 
 	let resourceLogs =  L.filter (\j -> toBare j == jid) $ MS.keys l
-	liftM concat $ liftIO $ atomically $ sequence $ L.map (\res -> case MS.lookup res l of
+	liftM (reverse . L.concat) $ liftIO $ atomically $ sequence $ L.map (\res -> case MS.lookup res l of
 			Nothing -> return []
 			Just logv ->
 				readTVar logv
 		) resourceLogs
 
-getLogS j = (liftM show) $ getLog j
+showLog :: [LogEntry] -> Text
+showLog = T.unlines . L.map (\(t, mn, m) -> T.concat
+		[S.toText (show t)
+		, "\t"
+		, fromMaybe "" mn
+		, "\t"
+		, m])
 
-putLog :: Jid -> Msg -> UTCTime -> Hate ()
-putLog j m t = do
+getLogS j = (liftM showLog) $ getLog j
+
+putLog :: Jid -> Msg -> Maybe Nickname -> UTCTime -> Hate ()
+putLog j m mn t = do
 	s <- ask
 	--liftIO $ print (j, m, t)
 	liftIO $ TIO.putStr $ putTkabberLog $ TkabberLog t j "" m 0
@@ -40,11 +50,11 @@ putLog j m t = do
 		ls <- readTVar $ logs s
 		case MS.lookup j ls of
 			Nothing -> do
-				logv <- newTVar $ [(t, m)]
+				logv <- newTVar $ [(t, mn, m)]
 				writeTVar (logs s) $ MS.insert j logv ls
 			Just logv -> do
 				log <- readTVar logv
-				writeTVar logv $ (t, m) : log
+				writeTVar logv $ (t, mn, m) : log
 	
 getLastLogTS :: Jid -> Hate (Maybe UTCTime)
 getLastLogTS j = do
@@ -53,7 +63,7 @@ getLastLogTS j = do
 	runMaybeT $ do
 		logv <- MaybeT $ return $ MS.lookup j ls
 		log <- lift $ readVar logv
-		pure $ fst $ head log
+		pure $ (\(time,_,_)->time) $ L.head log
 
 data TkabberLog = TkabberLog {
 		timestamp :: UTCTime,

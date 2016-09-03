@@ -190,7 +190,13 @@ receiver s se = flip runHate s $ forever $ do
 							_ -> mzero
 						parseTimeM False defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" $ T.unpack t :: Maybe UTCTime
 					let timestamp = fromMaybe now delayed_ts
-					lift $ putLog f text timestamp
+					let nick = if (typ == GroupChat)
+						then resourcepart f
+						else Nothing
+					let saneFrom = if (typ == GroupChat)
+						then toBare f
+						else f
+					lift $ putLog saneFrom text nick timestamp
 			PresenceS p@(Presence id from to lang typ pld attr) -> do
 				if L.null pld
 					then liftIO $ print ("simple presence", from, typ)
