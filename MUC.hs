@@ -36,7 +36,6 @@ rejoinMUCs = do
 			let (localp, domainp, _) = jidToTexts barejid
 			let jid = (\x -> assert (isJust x) (fromJust x)) $ jidFromTexts localp domainp (Just $ T.pack nick)
 			joinMUC jid (Just $ def { mhrSeconds = Just 200 }) se
-			sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "реконнектнулся блять") { messageType = GroupChat }) se
 			return ()
 		) $ MS.toList ms
 	-- TODO clear idea about how much of the history to request
