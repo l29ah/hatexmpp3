@@ -29,6 +29,7 @@ import Network.NineP.Error
 import Network.NineP.File
 import Network.TLS
 import Network.Xmpp
+import Network.Xmpp.Extras.AdHocCommands
 import Network.Xmpp.Extras.IQAvatar
 import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Extras.VCardAvatar
