@@ -23,6 +23,7 @@ import Data.String.Class as S
 import Data.Text as T
 import Data.Text.Encoding as E
 import Data.Time
+import Data.Word
 import Data.XML.Types as DXT
 import Network.NineP
 import Network.NineP.Error
@@ -218,19 +219,35 @@ connectS tsess = do
 		smf <- readVar $ featureStreamManagement3 s
 		when smf $ do
 			liftIO $ sendRaw "<enable xmlns='urn:xmpp:sm:3'/>" tsess
-			-- TODO error reporting
-			--liftIO $ flip withConnection tsess $ \stream -> do
-				--e <- withStream pullElement stream
-				--print e
-				--return ((), stream)
-			liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
-			--liftIO $ Prelude.putStrLn "SM!"
 			return ()
-	--liftIO $ flip withConnection tsess $ \stream -> return ((), stream)
 	liftIO $ initRoster tsess
 	liftIO $ sendPresence def tsess
 	writeVar (sess s) tsess
 	liftIO $ forkIO $ receiver s tsess
+
+streamManagementPlugin :: IO Plugin
+streamManagementPlugin = do
+	stanzaReceivedCount <- newIORef 0 :: IO (IORef Word32)
+	return $ (\out -> return $ Plugin'
+		{ inHandler = \sta as -> do
+			modifyIORef' stanzaReceivedCount succ
+			case sta of
+				XmppNonza e -> do
+					case TX.nameLocalName $ DXT.elementName e of
+						"enabled" -> writeIORef stanzaReceivedCount 0
+						"r" -> do
+							h <- readIORef stanzaReceivedCount
+							out $ XmppNonza $ DXT.Element "a" [
+								("xmlns",	[DXT.ContentText "urn:xmpp:sm:3"]),
+								("h",		[DXT.ContentText $ T.pack $ show h])
+								] []
+							return ()
+						_ -> return ()
+				_ -> return ()
+			return [(sta, as)]
+		, outHandler = out
+		, onSessionUp = const $ return ()
+		})
 
 rootmkdir "roster" = do
 		s <- ask
@@ -239,6 +256,7 @@ rootmkdir "roster" = do
 		pass <- readSVar $ password s
 		res <- readSVar $ resource s
 		unsafeCerts <- readVar $ permitUnsafeCerts s
+		sMP <- liftIO $ streamManagementPlugin
 		tsess <- liftIO (catchXmpp =<< session serv
 				(Just (\_ -> ([scramSha1 user Nothing pass]), if res == "" then Nothing else Just res))
 				(def	{
@@ -249,6 +267,7 @@ rootmkdir "roster" = do
 								else xmppDefaultParams
 						},
 						enableRoster = False,
+						plugins = [sMP],
 						onConnectionClosed = \sess _ -> do
 							BLC.putStrLn "Disconnected. Reconnecting..."
 							_ <- reconnect' sess
