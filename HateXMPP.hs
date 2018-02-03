@@ -46,6 +46,8 @@ import Types
 
 import Debug.Trace
 
+dbg = debugM "HateXMPP"
+
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
 
@@ -201,13 +203,13 @@ receiver s se = flip runHate s $ forever $ do
 					lift $ putLog saneFrom text nick timestamp
 			PresenceS p@(Presence id from to lang typ pld attr) -> do
 				if L.null pld
-					then liftIO $ print ("simple presence", from, typ)
+					then liftIO $ dbg $ show ("simple presence", from, typ)
 					else forM_ pld $ \e -> do
 						let en = DXT.elementName e
 						if TX.nameLocalName en == "x" && TX.nameNamespace en == Just "http://jabber.org/protocol/muc#user"
-							then liftIO $ print ("a muc guy has changed presence", from, typ)
-							else liftIO $ print ("unknown presence", from, typ, pld)
-			_ -> liftIO $ print stanza
+							then liftIO $ dbg $ show ("a muc guy has changed presence", from, typ)
+							else liftIO $ dbg $ show ("unknown presence", from, typ, pld)
+			_ -> liftIO $ dbg $ show stanza
 
 connectS tsess = do
 	s <- ask
@@ -293,6 +295,7 @@ initMain = do
 
 	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
 	--updateGlobalLogger "Network.NineP" $ setLevel DEBUG
+	--updateGlobalLogger "HateXMPP" $ setLevel DEBUG
 
 	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
 	writeIORef rootref [("config", configDir), ("mucs", mucsDir)]
