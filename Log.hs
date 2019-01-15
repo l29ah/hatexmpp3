@@ -28,8 +28,23 @@ getLog jid = do
 	liftM (reverse . L.concat) $ liftIO $ atomically $ sequence $ L.map (\res -> case MS.lookup res l of
 			Nothing -> return []
 			Just logv ->
-				readTVar logv
+				readTVar $ fst logv
 		) resourceLogs
+
+getTChanContents :: TChan a -> IO [a]
+getTChanContents c = do
+	x <- atomically $ readTChan c
+	cont <- getTChanContents c
+	return $ x : cont
+
+getLogLazy :: Jid -> Hate [LogEntry]
+getLogLazy jid = do
+	s <- ask
+	l <- liftIO $ readTVarIO $ logs s
+	liftIO $ maybe (return []) (\logv -> (\(list, tchan) -> liftM (list ++) $ getTChanContents tchan) =<< (atomically $ do
+			past <- readTVar $ fst logv
+			future <- dupTChan $ snd logv
+			return (past, future))) $ MS.lookup jid l
 
 showLog :: [LogEntry] -> Text
 showLog = T.unlines . L.map (\(t, mn, m) -> T.concat
@@ -40,6 +55,7 @@ showLog = T.unlines . L.map (\(t, mn, m) -> T.concat
 		, m])
 
 getLogS j = (liftM showLog) $ getLog j
+getLogLazyS j = (liftM showLog) $ getLogLazy j
 
 putLog :: Jid -> Msg -> Maybe Nickname -> UTCTime -> Hate ()
 putLog j m mn t = do
@@ -51,10 +67,13 @@ putLog j m mn t = do
 		case MS.lookup j ls of
 			Nothing -> do
 				logv <- newTVar $ [(t, mn, m)]
-				writeTVar (logs s) $ MS.insert j logv ls
-			Just logv -> do
+				logc <- newBroadcastTChan
+				writeTChan logc (t, mn, m)
+				writeTVar (logs s) $ MS.insert j (logv, logc) ls
+			Just (logv, logc) -> do
 				log <- readTVar logv
 				writeTVar logv $ (t, mn, m) : log
+				writeTChan logc (t, mn, m)
 	
 getLastLogTS :: Jid -> Hate (Maybe UTCTime)
 getLastLogTS j = do
@@ -62,7 +81,7 @@ getLastLogTS j = do
 	ls <- readVar $ logs s
 	runMaybeT $ do
 		logv <- MaybeT $ return $ MS.lookup j ls
-		log <- lift $ readVar logv
+		log <- lift $ readVar $ fst logv
 		pure $ (\(time,_,_)->time) $ L.head log
 
 data TkabberLog = TkabberLog {

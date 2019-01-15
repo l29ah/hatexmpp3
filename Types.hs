@@ -2,6 +2,7 @@
 
 module Types where
 
+import Control.Concurrent.STM.TChan
 import Control.Concurrent.STM.TVar
 import Control.Monad.EmbedIO
 import Control.Monad.Reader
@@ -14,7 +15,7 @@ type Hate = ReaderT GlobalState IO
 type Nickname = Text
 type Msg = Text
 type LogEntry = (UTCTime, Maybe Nickname, Msg)
-type Log = TVar [LogEntry]
+type Log = ((TVar [LogEntry]), (TChan LogEntry))
 type Logs = MS.Map Jid Log
 type MUCs = MS.Map Jid MUC
 

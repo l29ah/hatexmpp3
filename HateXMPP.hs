@@ -51,7 +51,7 @@ dbg = debugM "HateXMPP"
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
 
-chatFileRead typ jid = (liftM S.toLazyByteString) $ getLogS jid
+chatFileRead typ jid = (liftM S.toLazyByteString) $ getLogLazyS jid
 
 chatFileWrite typ jid text = do
 	s <- ask
