@@ -31,7 +31,7 @@ instance Configable Bool where
 	readcfg = Prelude.read . BLC.unpack	-- TODO
 	showcfg = BLC.pack . show
 
-configTVarReadWith c acc = Just (liftM c . liftIO . atomically . readTVar . acc =<< ask)
+configTVarReadWith c acc = Just (liftM c . liftIO . readTVarIO . acc =<< ask)
 configTVarWriteWith c acc x = liftIO . atomically . flip writeTVar (c x) . acc =<< ask
 configTVarReadC = configTVarReadWith showcfg
 configTVarWriteC = configTVarWriteWith readcfg
@@ -53,7 +53,7 @@ configDir = boringDir "config" [
 trimLn :: (Stringy s, Eq (StringCellChar s)) => s -> s
 trimLn s = maybe "" (\c -> if c == (S.fromChar '\n') then S.init s else s) $ S.safeLast s
 readVar :: TVar a -> Hate a
-readVar = liftIO . atomically . readTVar
+readVar = liftIO . readTVarIO
 readVarH :: (GlobalState -> IO a) -> Hate a
 readVarH acc = do
 	s <- ask
