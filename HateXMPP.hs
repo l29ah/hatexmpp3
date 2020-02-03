@@ -293,10 +293,6 @@ initMain = do
 	a <- getEnv "HATEXMPP_ADDRESS"
 	state <- initState
 
-	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
-	--updateGlobalLogger "Network.NineP" $ setLevel DEBUG
-	--updateGlobalLogger "HateXMPP" $ setLevel DEBUG
-
 	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
 	writeIORef rootref [("config", configDir), ("mucs", mucsDir)]
 	let ncfg = Config {
@@ -307,6 +303,9 @@ initMain = do
 	return (state, run9PServer ncfg)
 
 ghciMain = do
+	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
+	updateGlobalLogger "Network.NineP" $ setLevel DEBUG
+	updateGlobalLogger "HateXMPP" $ setLevel DEBUG
 	(state, runServer) <- initMain
 	forkIO $ runServer
 	return state
