@@ -1,13 +1,19 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, DoAndIfThenElse #-}
 
-module Log where
+module Log
+	( getLogLazyS
+	, putLog
+	) where
 
 import Control.Concurrent.STM
 import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
+import Data.ByteString as B
+import Data.ByteString.Lazy as BL
 import Data.Map.Strict as MS
 import Data.Maybe
 import Data.List as L
+import Data.Sequence as Seq
 import Data.String.Class as S
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -17,34 +23,14 @@ import Data.Time
 import Network.Xmpp.Internal hiding (priority, status)
 
 import Config
+import Control.Concurrent.STM.TByteVector as TBV
 import Types
 
-getLog :: Jid -> Hate [LogEntry]
-getLog jid = do
+lookupLog :: Jid -> Hate (Maybe Log)
+lookupLog jid = do
 	s <- ask
 	l <- liftIO $ readTVarIO $ logs s
-
-	let resourceLogs =  L.filter (\j -> toBare j == jid) $ MS.keys l
-	liftM (reverse . L.concat) $ liftIO $ atomically $ sequence $ L.map (\res -> case MS.lookup res l of
-			Nothing -> return []
-			Just logv ->
-				readTVar $ fst logv
-		) resourceLogs
-
-getTChanContents :: TChan a -> IO [a]
-getTChanContents c = do
-	x <- atomically $ readTChan c
-	cont <- getTChanContents c
-	return $ x : cont
-
-getLogLazy :: Jid -> Hate [LogEntry]
-getLogLazy jid = do
-	s <- ask
-	l <- liftIO $ readTVarIO $ logs s
-	liftIO $ maybe (return []) (\logv -> (\(list, tchan) -> liftM (list ++) $ getTChanContents tchan) =<< (atomically $ do
-			past <- readTVar $ fst logv
-			future <- dupTChan $ snd logv
-			return (past, future))) $ MS.lookup jid l
+	return $ MS.lookup jid l
 
 showLog :: [LogEntry] -> Text
 showLog = T.unlines . L.map (\(t, mn, m) -> T.concat
@@ -54,35 +40,51 @@ showLog = T.unlines . L.map (\(t, mn, m) -> T.concat
 		, "\t"
 		, m])
 
-getLogS j = (liftM showLog) $ getLog j
-getLogLazyS j = (liftM showLog) $ getLogLazy j
+fillLogS :: Log -> IO ()
+fillLogS (Log tentries tunshown shown) = do
+	atomically $ do
+		entries <- readTVar tentries
+		unshown <- readTVar tunshown
+		maybe retry (\newLogEntry -> do
+				TBV.append shown $ showLog [newLogEntry]
+				writeTVar tunshown (unshown + 1)
+			) $ Seq.lookup unshown entries
+
+readLogLazyS :: Log -> Word -> Word -> IO BL.ByteString
+readLogLazyS log offset len = do
+	cached <- atomically $ TBV.read (shownLog log) offset len
+	if B.null cached
+	then do
+		fillLogS log
+		readLogLazyS log offset len
+	else return $ BL.fromStrict cached
+
+getLogLazyS :: Jid -> Word -> Word -> Hate BL.ByteString
+getLogLazyS jid offset len = do
+	log <- lookupLog jid
+	liftIO $ maybe (return BL.empty) (\l -> readLogLazyS l offset len) log
+
+newLog :: STM Log
+newLog = do
+	le <- newTVar Seq.empty
+	idx <- newTVar 0
+	sl <- newTByteVector
+	return $ Log le idx sl
 
 putLog :: Jid -> Msg -> Maybe Nickname -> UTCTime -> Hate ()
 putLog j m mn t = do
 	s <- ask
 	--liftIO $ print (j, m, t)
-	liftIO $ TIO.putStr $ putTkabberLog $ TkabberLog t j "" m 0
+	--liftIO $ TIO.putStr $ putTkabberLog $ TkabberLog t j "" m 0
 	liftIO $ atomically $ do
 		ls <- readTVar $ logs s
 		case MS.lookup j ls of
 			Nothing -> do
-				logv <- newTVar $ [(t, mn, m)]
-				logc <- newBroadcastTChan
-				writeTChan logc (t, mn, m)
-				writeTVar (logs s) $ MS.insert j (logv, logc) ls
-			Just (logv, logc) -> do
-				log <- readTVar logv
-				writeTVar logv $ (t, mn, m) : log
-				writeTChan logc (t, mn, m)
-	
-getLastLogTS :: Jid -> Hate (Maybe UTCTime)
-getLastLogTS j = do
-	s <- ask
-	ls <- readVar $ logs s
-	runMaybeT $ do
-		logv <- MaybeT $ return $ MS.lookup j ls
-		log <- lift $ readVar $ fst logv
-		pure $ (\(time,_,_)->time) $ L.head log
+				newlog <- newLog
+				writeTVar (logEntries newlog) $ Seq.singleton (t, mn, m)
+				writeTVar (logs s) $ MS.insert j newlog ls
+			Just (Log entries _ _) -> do
+				modifyTVar entries $ \seq -> seq |> (t, mn, m)
 
 data TkabberLog = TkabberLog {
 		timestamp :: UTCTime,

@@ -25,7 +25,7 @@ import Data.Text.Encoding as E
 import Data.Time
 import Data.Word
 import Data.XML.Types as DXT
-import Network.NineP
+import Network.NineP as NP
 import Network.NineP.Error
 import Network.NineP.File
 import Network.TLS
@@ -51,7 +51,8 @@ dbg = debugM "HateXMPP"
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
 
-chatFileRead typ jid = (liftM S.toLazyByteString) $ getLogLazyS jid
+--chatFileRead :: Word64 -> Word32 -> Hate ByteString
+chatFileRead typ jid offset len = getLogLazyS jid (fromIntegral offset) (fromIntegral len)
 
 chatFileWrite typ jid text = do
 	s <- ask
@@ -61,7 +62,7 @@ chatFileWrite typ jid text = do
 		return $ either (throw . OtherError . show) (id) result
 
 chatFile jid = --simpleFile (T.unpack $ jidToText jid)
-	rwFile (T.unpack $ jidToText jid) (Just $ chatFileRead Chat jid) (Just $ chatFileWrite Chat jid)
+	(rwFile (T.unpack $ jidToText jid) Nothing (Just $ chatFileWrite Chat jid)) { NP.read = chatFileRead Chat jid }
 
 vcAvatarRead jid = do
 	s <- ask
@@ -125,7 +126,7 @@ rosterDir = (boringDir "roster" []) {
 readMUCChat jid = chatFileRead GroupChat jid
 writeMUCChat jid = chatFileWrite GroupChat jid
 
-mucChat jid = rwFile "__chat" (Just $ readMUCChat jid) (Just $ writeMUCChat jid)
+mucChat jid = (rwFile "__chat" Nothing (Just $ writeMUCChat jid)) { NP.read = chatFileRead Chat jid }
 
 muc jid = boringDir (T.unpack $ jidToText jid) [("__chat", mucChat jid)]
 

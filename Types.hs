@@ -7,17 +7,25 @@ import Control.Concurrent.STM.TVar
 import Control.Monad.EmbedIO
 import Control.Monad.Reader
 import Data.Map.Strict as MS
+import Data.Sequence
 import Data.Text as Text
 import Data.Time.Clock
 import Network.Xmpp
+
+import Control.Concurrent.STM.TByteVector
 
 type Hate = ReaderT GlobalState IO
 type Nickname = Text
 type Msg = Text
 type LogEntry = (UTCTime, Maybe Nickname, Msg)
-type Log = ((TVar [LogEntry]), (TChan LogEntry))
 type Logs = MS.Map Jid Log
 type MUCs = MS.Map Jid MUC
+
+data Log = Log
+	{ logEntries :: TVar (Seq LogEntry)
+	, firstUnshownLogIdx :: TVar Int
+	, shownLog :: TByteVector
+	}
 
 runHate = runReaderT
 
