@@ -12,7 +12,7 @@ import Data.Text as Text
 import Data.Time.Clock
 import Network.Xmpp
 
-import Control.Concurrent.STM.TByteVector
+import TByteVector
 
 type Hate = ReaderT GlobalState IO
 type Nickname = Text

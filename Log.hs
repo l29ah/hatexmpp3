@@ -23,7 +23,7 @@ import Data.Time
 import Network.Xmpp.Internal hiding (priority, status)
 
 import Config
-import Control.Concurrent.STM.TByteVector as TBV
+import TByteVector as TBV
 import Types
 
 lookupLog :: Jid -> Hate (Maybe Log)
@@ -42,13 +42,12 @@ showLog = T.unlines . L.map (\(t, mn, m) -> T.concat
 
 fillLogS :: Log -> IO ()
 fillLogS (Log tentries tunshown shown) = do
-	atomically $ do
+	(newLogEntry, unshown) <- atomically $ do
 		entries <- readTVar tentries
 		unshown <- readTVar tunshown
-		maybe retry (\newLogEntry -> do
-				TBV.append shown $ showLog [newLogEntry]
-				writeTVar tunshown (unshown + 1)
-			) $ Seq.lookup unshown entries
+		maybe retry (\ent -> return (ent, unshown)) $ Seq.lookup unshown entries
+	TBV.append shown $ showLog [newLogEntry]
+	atomically $ writeTVar tunshown (unshown + 1)
 
 readLogLazyS :: Log -> Word -> Word -> IO BL.ByteString
 readLogLazyS log offset len = do
@@ -64,10 +63,10 @@ getLogLazyS jid offset len = do
 	log <- lookupLog jid
 	liftIO $ maybe (return BL.empty) (\l -> readLogLazyS l offset len) log
 
-newLog :: STM Log
+newLog :: IO Log
 newLog = do
-	le <- newTVar Seq.empty
-	idx <- newTVar 0
+	le <- newTVarIO Seq.empty
+	idx <- newTVarIO 0
 	sl <- newTByteVector
 	return $ Log le idx sl
 
@@ -76,11 +75,11 @@ putLog j m mn t = do
 	s <- ask
 	--liftIO $ print (j, m, t)
 	--liftIO $ TIO.putStr $ putTkabberLog $ TkabberLog t j "" m 0
+	newlog <- liftIO newLog
 	liftIO $ atomically $ do
 		ls <- readTVar $ logs s
 		case MS.lookup j ls of
 			Nothing -> do
-				newlog <- newLog
 				writeTVar (logEntries newlog) $ Seq.singleton (t, mn, m)
 				writeTVar (logs s) $ MS.insert j newlog ls
 			Just (Log entries _ _) -> do
