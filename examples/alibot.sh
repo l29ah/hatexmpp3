@@ -21,7 +21,7 @@ sleep 1
 mkdir "$dir/mucs/$c"
 sleep 1
 dd if="$chatpath" iflag=nonblock bs=65536 | while read -r line; do
-url=$(echo "$line" | sed -ne 's#.*http[^ ]*aliexpress.*/item/\([^ ]*\)*.*#https://aliexpress.com/i/\1#p')
+url=$(echo "$line" | sed -ne 's#.*http[^ ]*aliexpress.*/item/\([^ ?]*\)*.*#https://aliexpress.com/i/\1#p')
 if [ -n "$url" ]; then
 	echo -n "$url" >> "$chatpath"
 fi
