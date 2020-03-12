@@ -45,6 +45,7 @@ configDir = boringDir "config" [
 		rwfc "username" username,
 		rwfc "password" password,
 		rwfc "resource" resource,
+		rwfc "muc_default_nick" muc_default_nick,
 		rwfc "status" status,
 		rwfc "stream_management" streamManagement,
 		rwfc "permit_all_certs" permitUnsafeCerts
