@@ -12,6 +12,7 @@ export HATEXMPP_ADDRESS="unix!$sock"
 while [ ! -e $sock ]; do sleep 1; done
 mkdir -p "$dir"
 9mount "$sock" "$dir"
+trap 'rm "$sock"; 9umount "$dir"' EXIT
 cp ~/.config/hatexmpp3/* "$dir/config/"
 echo -n alibot > "$dir/config/resource"
 echo -n alibot > "$dir/config/muc_default_nick"
