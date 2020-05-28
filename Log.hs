@@ -2,6 +2,7 @@
 
 module Log
 	( getLogLazyS
+	, initLog
 	, putLog
 	) where
 
@@ -58,6 +59,7 @@ readLogLazyS log offset len = do
 		readLogLazyS log offset len
 	else return $ BL.fromStrict cached
 
+-- |Read the specific portion of the log, waiting for yet unavailable data
 getLogLazyS :: Jid -> Word -> Word -> Hate BL.ByteString
 getLogLazyS jid offset len = do
 	log <- lookupLog jid
@@ -70,18 +72,28 @@ newLog = do
 	sl <- newTByteVector
 	return $ Log le idx sl
 
+-- |Create a jid-attached log if it doesn't exist yet
+initLog :: Jid -> Hate ()
+initLog j = do
+	s <- ask
+	newlog <- liftIO newLog
+	liftIO $ atomically $ do
+		ls <- readTVar $ logs s
+		when (isNothing $ MS.lookup j ls) $ do
+			writeTVar (logEntries newlog) $ Seq.empty
+			writeTVar (logs s) $ MS.insert j newlog ls
+
+
 putLog :: Jid -> Msg -> Maybe Nickname -> UTCTime -> Hate ()
 putLog j m mn t = do
 	s <- ask
 	--liftIO $ print (j, m, t)
 	--liftIO $ TIO.putStr $ putTkabberLog $ TkabberLog t j "" m 0
-	newlog <- liftIO newLog
+	initLog j
 	liftIO $ atomically $ do
 		ls <- readTVar $ logs s
 		case MS.lookup j ls of
-			Nothing -> do
-				writeTVar (logEntries newlog) $ Seq.singleton (t, mn, m)
-				writeTVar (logs s) $ MS.insert j newlog ls
+			-- logs are never destroyed so fromJust always succeeds
 			Just (Log entries _ _) -> do
 				modifyTVar entries $ \seq -> seq |> (t, mn, m)
 

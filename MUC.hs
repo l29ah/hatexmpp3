@@ -19,10 +19,12 @@ import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Internal hiding (priority, status)
 
 import Config
+import Log
 import Types
 
 addMUC :: Jid -> String -> Hate ()
 addMUC jid nick = do
+	initLog jid
 	s <- ask
 	liftIO $ atomically $ do
 		ms <- readTVar $ mucs s
