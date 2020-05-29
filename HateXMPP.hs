@@ -10,17 +10,19 @@ import Control.Monad
 import Control.Monad.EmbedIO
 import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
-import Data.ByteString as B
-import Data.ByteString.Lazy as BL
-import Data.ByteString.Lazy.Char8 as BLC
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Default
 import Data.IORef
 import Data.List as L
-import Data.Map as M
-import Data.Map.Strict as MS
+import qualified Data.Map as M
+import Data.Map.Strict (keys)
+import qualified Data.Map.Strict as MS
 import Data.Maybe
-import Data.String.Class as S
-import Data.Text as T
+import Data.String.Class (toText)
+import qualified Data.String.Class as S
+import qualified Data.Text as T
 import Data.Text.Encoding as E
 import Data.Time
 import Data.Word
@@ -35,6 +37,7 @@ import Network.Xmpp.Extras.IQAvatar
 import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Extras.VCardAvatar
 import Network.Xmpp.Internal hiding (priority, status)
+import System.Console.GetOpt
 import System.Environment
 import System.Log.Logger
 import qualified Text.XML as TX
@@ -45,6 +48,30 @@ import MUC
 import Types
 
 import Debug.Trace
+
+data Options = Options
+	{ oXMPPLogPrio :: Priority
+	, o9PLogPrio :: Priority
+	} deriving (Eq, Show)
+
+defaultOptions = Options
+	{ oXMPPLogPrio = WARNING
+	, o9PLogPrio = WARNING
+	}
+
+options :: [OptDescr (Options -> Options)]
+options =
+	[ Option ['d']	["username"]	(NoArg	(\o -> o { o9PLogPrio = DEBUG }))		"Debug 9P messages"
+	, Option ['v']	["verbose"]	(NoArg	(\o -> o { oXMPPLogPrio = DEBUG }))		"Be verbose on what's happening on the XMPP wire"
+	]
+
+getOpts :: IO (Options, [String])
+getOpts = do
+	args <- getArgs
+	pn <- getProgName
+	case getOpt Permute options args of
+		(o,n,[]  ) -> return (foldl (flip id) defaultOptions o, n)
+		(_,_,errs) -> ioError (userError (concat errs ++ usageInfo ("Usage: " ++ pn ++ " [options]") options))
 
 dbg = debugM "HateXMPP"
 
@@ -291,6 +318,11 @@ rootmkdir "test" = do
 rootmkdir _ = throw $ EInval
 
 initMain = do
+	(opts, _) <- getOpts
+	updateGlobalLogger "Pontarius.Xmpp" $ setLevel $ oXMPPLogPrio opts
+	updateGlobalLogger "Network.NineP" $ setLevel $ o9PLogPrio opts
+	updateGlobalLogger "HateXMPP" $ setLevel $ oXMPPLogPrio opts
+
 	a <- getEnv "HATEXMPP_ADDRESS"
 	state <- initState
 
@@ -304,9 +336,6 @@ initMain = do
 	return (state, run9PServer ncfg)
 
 ghciMain = do
-	updateGlobalLogger "Pontarius.Xmpp" $ setLevel DEBUG
-	updateGlobalLogger "Network.NineP" $ setLevel DEBUG
-	updateGlobalLogger "HateXMPP" $ setLevel DEBUG
 	(state, runServer) <- initMain
 	forkIO $ runServer
 	return state
