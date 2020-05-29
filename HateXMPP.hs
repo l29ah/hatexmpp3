@@ -252,14 +252,19 @@ connectS tsess = do
 			liftIO $ sendRaw "<enable xmlns='urn:xmpp:sm:3'/>" tsess
 			return ()
 	liftIO $ initRoster tsess
-	liftIO $ forkIO $ updateStatus tsess $ status s
+	liftIO $ forkIO $ updateStatus tsess (status s) (mucs s)
 	writeVar (sess s) tsess
 	liftIO $ forkIO $ receiver s tsess
 
-updateStatus :: Session -> TVar String -> IO ()
-updateStatus tsess statusVar = do
+updateStatus :: Session -> TVar String -> TVar MUCs -> IO ()
+updateStatus tsess statusVar mucsVar = do
 	initialStatus <- readTVarIO statusVar
-	let sendStatus s = sendPresence (withIMPresence (def { IMP.status = Just $ toText s }) def) tsess
+	let sendStatus s = do
+		let sendPresenceTo mjid = sendPresence (withIMPresence (def { IMP.status = Just $ toText s }) def { presenceTo = mjid }) tsess
+		sendPresenceTo Nothing
+		-- also send the presence update to all the MUCs we participate in
+		currentMUCs <- readTVarIO mucsVar
+		mapM_ (sendPresenceTo . Just) $ keys currentMUCs
 	void $ sendStatus initialStatus
 	fix (\again previousStatus -> do
 		changedStatus <- atomically $ do
