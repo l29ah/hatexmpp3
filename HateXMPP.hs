@@ -37,6 +37,7 @@ import Network.Xmpp.Extras.IQAvatar
 import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Extras.VCardAvatar
 import Network.Xmpp.Internal hiding (priority, status)
+import qualified Network.Xmpp.IM.Presence as IMP
 import System.Console.GetOpt
 import System.Environment
 import System.Log.Logger
@@ -251,9 +252,22 @@ connectS tsess = do
 			liftIO $ sendRaw "<enable xmlns='urn:xmpp:sm:3'/>" tsess
 			return ()
 	liftIO $ initRoster tsess
-	liftIO $ sendPresence def tsess
+	liftIO $ forkIO $ updateStatus tsess $ status s
 	writeVar (sess s) tsess
 	liftIO $ forkIO $ receiver s tsess
+
+updateStatus :: Session -> TVar String -> IO ()
+updateStatus tsess statusVar = do
+	initialStatus <- readTVarIO statusVar
+	let sendStatus s = sendPresence (withIMPresence (def { IMP.status = Just $ toText s }) def) tsess
+	void $ sendStatus initialStatus
+	fix (\again previousStatus -> do
+		changedStatus <- atomically $ do
+			newStatus <- readTVar statusVar
+			check (newStatus /= previousStatus)
+			pure newStatus
+		void $ sendStatus changedStatus
+		again changedStatus) initialStatus
 
 streamManagementPlugin :: IO Plugin
 streamManagementPlugin = do
