@@ -137,7 +137,7 @@ rosterDir = (boringDir "roster" []) {
 			s <- ask
 			se <- readVar $ sess s
 			roster <- liftIO $ getRoster se
-			liftIO $ Prelude.putStrLn $ "roster ver: " ++ (show $ ver roster)
+			liftIO $ dbg $ "roster ver: " ++ (show $ ver roster)
 			--liftIO $ print $ fmap (show . riJid) $ items roster
 			return $ fmap (rosterItem) $ keys $ items roster,
 		descend = \name -> do
@@ -299,7 +299,7 @@ rootmkdir "roster" = do
 						enableRoster = False,
 						plugins = [sMP],
 						onConnectionClosed = \sess _ -> do
-							BLC.putStrLn "Disconnected. Reconnecting..."
+							noticeM "HateXMPP" "Disconnected. Reconnecting..."
 							_ <- reconnect' sess
 							flip runHate s $ do
 								connectS sess
