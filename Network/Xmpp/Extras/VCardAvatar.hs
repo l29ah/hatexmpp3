@@ -12,7 +12,6 @@ module Network.Xmpp.Extras.VCardAvatar
 import Data.Default
 import Data.Maybe
 import Data.Text as T
-import Data.Time
 import Data.XML.Types as DXT
 import Network.Xmpp.Extras.DateTime
 import Network.Xmpp.Internal hiding (priority, status)
