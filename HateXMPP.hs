@@ -317,8 +317,8 @@ rootmkdir "roster" = do
 						},
 						enableRoster = False,
 						plugins = [sMP],
-						onConnectionClosed = \sess _ -> do
-							noticeM "HateXMPP" "Disconnected. Reconnecting..."
+						onConnectionClosed = \sess why -> do
+							noticeM "HateXMPP" $ "Disconnected (" ++ show why ++ "). Reconnecting..."
 							_ <- reconnect' sess
 							flip runHate s $ do
 								connectS sess
