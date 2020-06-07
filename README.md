@@ -1,3 +1,5 @@
+hatexmpp3 is just another attempt at a filesystem-interfaced XMPP client.
+
 ## Standards implemented:
 * XEP-0045: Multi-User Chat
 	* entering MUCs
