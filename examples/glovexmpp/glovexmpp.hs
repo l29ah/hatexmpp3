@@ -50,26 +50,26 @@ main = do
 	w <- windowNew
 	onDestroy w mainQuit
 	windowSetTitle w ("glovexmpp" :: Text)
+	windowSetDefaultSize w 500 500
 
 	logb <- textBufferNew Nothing
 	logv <- textViewNewWithBuffer logb
 	textViewSetEditable logv False
 	textViewSetCursorVisible logv False
 
-        inputb <- textBufferNew Nothing
-        inputv <- textViewNewWithBuffer inputb
+	inputb <- textBufferNew Nothing
+	inputv <- textViewNewWithBuffer inputb
 	textViewSetAcceptsTab inputv True
 	onKeyPress inputv $ inputKeyPressed inputb
-	--logp <- panelNew
-	--inputp <- panelNew
 	panels <- vPanedNew
-	panedAdd1 panels logv
-	panedAdd2 panels inputv
-	panedSetPosition panels 50
+	panedPack1 panels logv True False
+	panedPack2 panels inputv True False
 
 	set w [ containerChild := panels ]
 	widgetShowAll w
-	--windowPresent w
+	Rectangle _ _ _ height <- widgetGetAllocation panels
+	print height
+	panedSetPosition panels (round (0.9 * fromIntegral height))
 	
 	-- Inbound messages drawing thread
 	forkOS $ forever $ do 
