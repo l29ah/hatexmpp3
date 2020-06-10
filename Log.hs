@@ -33,13 +33,18 @@ lookupLog jid = do
 	l <- liftIO $ readTVarIO $ logs s
 	return $ MS.lookup jid l
 
+-- tabs are banned in JIDs as control characters, so they can be used as JID separators:
+-- https://tools.ietf.org/html/rfc6122#appendix-A.5
+-- https://tools.ietf.org/html/rfc3454#appendix-C.2.1
+-- NUL is banned in XML, so it can be used as a message separator
 showLog :: [LogEntry] -> Text
 showLog = T.unlines . L.map (\(t, mn, m) -> T.concat
 		[S.toText (show t)
 		, "\t"
 		, fromMaybe "" mn
 		, "\t"
-		, m])
+		, m
+		, "\0"])
 
 fillLogS :: Log -> IO ()
 fillLogS (Log tentries tunshown shown) = do
