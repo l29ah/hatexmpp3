@@ -3,7 +3,6 @@
 module Config where
 
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
 import Control.Monad
 import Control.Monad.Reader
 import Data.ByteString as B

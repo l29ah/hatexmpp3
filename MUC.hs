@@ -5,16 +5,10 @@ module MUC where
 import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad.Reader
-import Control.Monad.Trans.Maybe
 import Data.Default
 import qualified Data.Map.Strict as MS
-import Data.List as L
 import Data.Maybe
-import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.IO as TIO
-import Data.Text.Encoding
-import Data.Time
 import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Internal hiding (priority, status)
 

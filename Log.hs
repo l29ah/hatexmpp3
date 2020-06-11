@@ -8,7 +8,6 @@ module Log
 
 import Control.Concurrent.STM
 import Control.Monad.Reader
-import Control.Monad.Trans.Maybe
 import Data.ByteString as B
 import Data.ByteString.Lazy as BL
 import Data.Map.Strict as MS
@@ -18,12 +17,9 @@ import Data.Sequence as Seq
 import Data.String.Class as S
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.IO as TIO
-import Data.Text.Encoding
 import Data.Time
 import Network.Xmpp.Internal hiding (priority, status)
 
-import Config
 import TByteVector as TBV
 import Types
 
@@ -112,20 +108,20 @@ data TkabberLog = TkabberLog {
 
 --getTkabberLog :: Text -> TkabberLog
 
-putTkabberLog :: TkabberLog -> Text
-putTkabberLog (TkabberLog ts jid nick body me) = T.concat [
-		"timestamp ",
-		T.pack $ formatTime defaultTimeLocale "%Y%m%dT%H%M%S" ts,
-		" jid ",
-		escape $ jidToText jid,
-		" nick ",
-		escape nick,
-		" body ",
-		escape body,
-		" me ",
-		T.pack $ show me,
-		"\n"]
-	where
-		--escape t = if T.length t == 0 then "{}" else esc ' ' "\\\\ " $ esc '}' "\\}" $ esc '\n' "\\n" $ esc '\\' "\\\\" t
-		escape t = if T.length t == 0 then "{}" else L.foldl (\it c -> esc c (T.pack $ '\\':'\\':c:[]) it) (esc '\n' "\\\\n" $ esc '\\' "\\\\\\\\" t) ("{}\" $[]" :: String)
-		esc c e t = T.concat $ L.intersperse e $ T.split (== c) t
+--putTkabberLog :: TkabberLog -> Text
+--putTkabberLog (TkabberLog ts jid nick body me) = T.concat [
+--		"timestamp ",
+--		T.pack $ formatTime defaultTimeLocale "%Y%m%dT%H%M%S" ts,
+--		" jid ",
+--		escape $ jidToText jid,
+--		" nick ",
+--		escape nick,
+--		" body ",
+--		escape body,
+--		" me ",
+--		T.pack $ show me,
+--		"\n"]
+--	where
+--		--escape t = if T.length t == 0 then "{}" else esc ' ' "\\\\ " $ esc '}' "\\}" $ esc '\n' "\\n" $ esc '\\' "\\\\" t
+--		escape t = if T.length t == 0 then "{}" else L.foldl (\it c -> esc c (T.pack $ '\\':'\\':c:[]) it) (esc '\n' "\\\\n" $ esc '\\' "\\\\\\\\" t) ("{}\" $[]" :: String)
+--		esc c e t = T.concat $ L.intersperse e $ T.split (== c) t

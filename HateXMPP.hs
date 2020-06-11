@@ -4,10 +4,8 @@ module Main where
 
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
 import Control.Exception
 import Control.Monad
-import Control.Monad.EmbedIO
 import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString as B
@@ -21,10 +19,7 @@ import Data.Map.Strict (keys)
 import qualified Data.Map.Strict as MS
 import Data.Maybe
 import Data.String.Class (toText)
-import qualified Data.String.Class as S
-import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding as E
 import Data.Time
 import Data.Word
 import Data.XML.Types as DXT
@@ -33,7 +28,6 @@ import Network.NineP.Error
 import Network.NineP.File
 import Network.TLS
 import Network.Xmpp
-import Network.Xmpp.Extras.AdHocCommands
 import Network.Xmpp.Extras.IQAvatar
 import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Extras.VCardAvatar
@@ -86,7 +80,7 @@ catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
 
 chatFileRead :: MessageType -> Jid -> Word64 -> Word32 -> Hate BLC.ByteString
-chatFileRead typ jid offset len = getLogLazyS jid (fromIntegral offset) (fromIntegral len)
+chatFileRead _ jid offset len = getLogLazyS jid (fromIntegral offset) (fromIntegral len)
 
 chatFileWrite :: MessageType -> Jid -> BL.ByteString -> Hate ()
 chatFileWrite typ jid text = do
@@ -145,16 +139,12 @@ rosterDir = (boringDir "roster" []) {
 			s <- ask
 			se <- readVar $ sess s
 			roster <- liftIO $ getRoster se
-			liftIO $ dbg $ "roster ver: " ++ (show $ ver roster)
-			--liftIO $ print $ fmap (show . riJid) $ items roster
 			return $ fmap (rosterItem) $ keys $ items roster,
 		descend = \name -> do
 			s <- ask
 			se <- readVar $ sess s
-			roster <- liftIO $ getRoster se
 			maybe (throw $ ENoFile name) (return . rosterItem) $ do
 				jid <- jidFromText $ T.pack name
-				--M.lookup jid $ items roster
 				return jid
 	}
 
@@ -205,7 +195,7 @@ sendRaw :: B.ByteString -> Session -> IO (Either XmppFailure ())
 sendRaw d s = semWrite (writeSemaphore s) d
 
 processOtherFeatures :: Session -> DXT.Element -> Hate ()
-processOtherFeatures s e = do
+processOtherFeatures _ e = do
 	s <- ask
 	forM_ (TX.nameNamespace $ DXT.elementName e) $ \ns -> do
 		case ns of
@@ -223,7 +213,7 @@ handleReceivedMessage from msg nick timestamp = do
 
 receiver :: GlobalState -> Session -> IO ()
 receiver s se = flip runHate s $ forever $ do
-		(stanza, ann) <- liftIO $ getStanza se
+		(stanza, _) <- liftIO $ getStanza se
 		case stanza of
 			MessageS (Message id from to lang typ pld attr) -> void $ runMaybeT $ do
 					f <- MaybeT $ pure from

@@ -3,25 +3,18 @@ module GTK.Chat
 	( addChat
 	) where
 
-import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Concurrent.STM.TVar
-import Control.Monad
 import Control.Monad.Loops
 import Control.Monad.Reader
 import Data.DateTime
-import Data.Char
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.String.Class as S
 import Data.Text as T
-import Data.Text.IO as TIO
 import Data.Time
 import Graphics.UI.Gtk hiding (eventKeyName, eventModifier)
 import Graphics.UI.Gtk.Gdk.Events
-import Graphics.UI.Gtk.Abstract.Paned
 import Network.Xmpp
-import System.IO
 
 import Types
 

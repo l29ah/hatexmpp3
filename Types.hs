@@ -2,8 +2,7 @@
 
 module Types where
 
-import Control.Concurrent.STM.TChan
-import Control.Concurrent.STM.TVar
+import Control.Concurrent.STM
 import Control.Monad.EmbedIO
 import Control.Monad.Reader
 import Data.Map.Strict as MS
