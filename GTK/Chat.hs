@@ -7,6 +7,7 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TVar
 import Control.Monad
+import Control.Monad.Loops
 import Control.Monad.Reader
 import Data.DateTime
 import Data.Char
@@ -26,12 +27,13 @@ import Types
 
 renderMessage :: (UTCTime, Maybe Nickname, Msg) -> Text
 renderMessage (t, mn, m) = T.concat
-		[ S.fromString $ formatDateTime "[%T]" t
+		[ "\n"
+		, S.fromString $ formatDateTime "[%T]" t
 		, "<"
 		, fromMaybe "" mn
 		, ">"
 		, m
-		, "\n"]
+		]
 
 addChat :: Jid -> (Msg -> IO ()) -> Hate ()
 addChat jid message_cb = do
@@ -50,8 +52,13 @@ addChat jid message_cb = do
 		inputv <- textViewNewWithBuffer inputb
 		textViewSetAcceptsTab inputv True
 		onKeyPress inputv $ inputKeyPressed inputb message_cb
+
+		logScroll <- scrolledWindowNew Nothing Nothing
+		scrolledWindowSetPolicy logScroll PolicyNever PolicyAutomatic
+		containerAdd logScroll logv
+
 		panels <- vPanedNew
-		panedPack1 panels logv True False
+		panedPack1 panels logScroll True False
 		panedPack2 panels inputv True False
 
 		set w [ containerChild := panels ]
@@ -61,8 +68,11 @@ addChat jid message_cb = do
 	
 		pure (\entry -> do
 			postGUISync $ bufferAdd logb $ renderMessage entry
+			-- wait for the buffer to draw // https://stackoverflow.com/a/40917718/4095104
+			postGUISync $ whileM_ (fmap (> 0) eventsPending) $ mainIterationDo False
+			-- scroll the log to the newly received message
 			ei <- postGUISync $ textBufferGetEndIter logb
-			postGUISync $ textViewScrollToIter logv ei 0 Nothing
+			postGUISync $ textViewScrollToIter logv ei 0 $ Just (1, 1)
 			pure ()
 			)
 	s <- ask

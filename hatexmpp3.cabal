@@ -40,4 +40,5 @@ Executable      hatexmpp
                 cpp-options: -DUI_GTK
                 build-depends:
                         gtk ^>= 0.14,
-                        datetime ^>= 0.3.1
+                        datetime ^>= 0.3.1,
+                        monad-loops ^>= 0.4.3
