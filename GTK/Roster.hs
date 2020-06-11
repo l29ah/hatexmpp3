@@ -24,7 +24,7 @@ spawnRosterWindow :: Hate ()
 spawnRosterWindow = do
 	addToRoster <- liftIO $ postGUISync $ do
 		w <- windowNew
-		windowSetTitle w ("hatexmpp roster" :: Text)
+		set w [windowTitle := ("hatexmpp roster" :: Text)]
 		windowSetDefaultSize w 300 800
 
 		view <- MView.treeViewNew

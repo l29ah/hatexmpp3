@@ -12,8 +12,7 @@ import Data.Maybe
 import qualified Data.String.Class as S
 import Data.Text as T
 import Data.Time
-import Graphics.UI.Gtk hiding (eventKeyName, eventModifier)
-import Graphics.UI.Gtk.Gdk.Events
+import Graphics.UI.Gtk
 import Network.Xmpp
 
 import Types
@@ -32,7 +31,7 @@ addChat :: Jid -> (Msg -> IO ()) -> Hate ()
 addChat jid message_cb = do
 	handler <- liftIO $ postGUISync $ do
 		w <- windowNew
-		windowSetTitle w ("glovexmpp" :: Text)
+		set w [windowTitle := jidToText jid]
 		windowSetDefaultSize w 500 500
 
 		logb <- textBufferNew Nothing
@@ -44,7 +43,7 @@ addChat jid message_cb = do
 		inputb <- textBufferNew Nothing
 		inputv <- textViewNewWithBuffer inputb
 		textViewSetAcceptsTab inputv True
-		onKeyPress inputv $ inputKeyPressed inputb message_cb
+		inputv `on` keyPressEvent $ inputKeyPressed inputb message_cb
 
 		logScroll <- scrolledWindowNew Nothing Nothing
 		scrolledWindowSetPolicy logScroll PolicyNever PolicyAutomatic
@@ -79,12 +78,15 @@ bufferGet tb = do
 
 bufferAdd :: TextBuffer -> Text -> IO ()
 bufferAdd tb s = do
-	t <- bufferGet tb
-	textBufferSetText tb $ T.concat [t, s]
+	ei <- textBufferGetEndIter tb
+	textBufferInsert tb ei s
 
 -- Keypress event handler
-inputKeyPressed inputb message_cb e = if (eventKeyName e == "Return") && (notElem Shift $ eventModifier e)
-	then do	
+inputKeyPressed inputb message_cb = do
+	key <- eventKeyName
+	mods <- eventModifier
+	liftIO $ if (key == "Return") && (notElem Shift mods)
+	then do
 		t <- bufferGet inputb
 		message_cb t
 		textBufferSetText inputb ("" :: Text)

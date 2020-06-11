@@ -39,6 +39,6 @@ Executable      hatexmpp
         if flag(gtk)
                 cpp-options: -DUI_GTK
                 build-depends:
-                        gtk ^>= 0.14,
+                        gtk3 ^>= 0.14,
                         datetime ^>= 0.3.1,
                         monad-loops ^>= 0.4.3
