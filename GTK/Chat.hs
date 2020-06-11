@@ -42,6 +42,7 @@ addChat jid message_cb = do
 
 		logb <- textBufferNew Nothing
 		logv <- textViewNewWithBuffer logb
+		textViewSetWrapMode logv WrapWordChar
 		textViewSetEditable logv False
 		textViewSetCursorVisible logv False
 
