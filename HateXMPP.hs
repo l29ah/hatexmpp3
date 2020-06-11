@@ -62,7 +62,7 @@ defaultOptions = Options
 
 options :: [OptDescr (Options -> Options)]
 options =
-	[ Option ['d']	["username"]	(NoArg	(\o -> o { o9PLogPrio = DEBUG }))		"Debug 9P messages"
+	[ Option ['d']	["debug-9p"]	(NoArg	(\o -> o { o9PLogPrio = DEBUG }))		"Debug 9P messages"
 	, Option ['v']	["verbose"]	(NoArg	(\o -> o { oXMPPLogPrio = DEBUG }))		"Be verbose on what's happening on the XMPP wire"
 	]
 
