@@ -51,6 +51,7 @@ import Types
 #ifdef UI_GTK
 import GTK.GTK
 import GTK.Chat
+import qualified GTK.Roster as GR
 #endif
 
 import Debug.Trace
@@ -165,6 +166,7 @@ mucChat jid = (rwFile "__chat" Nothing (Just $ writeMUCChat jid)) { NP.read = ch
 muc jid = boringDir (T.unpack $ jidToText jid) [("__chat", mucChat jid)]
 
 mucsmkdir name = do
+	s <- ask
 	se <- readVarH (readTVarIO . sess)
 	nick <- readVarH (readTVarIO . muc_default_nick)
 	let barejid = fromMaybe (throw EInval) $ jidFromText $ T.pack name
@@ -174,16 +176,14 @@ mucsmkdir name = do
 	-- TODO error reporting
 	let sendMsg text = sendMessage ((simpleIM barejid text) { messageType = GroupChat }) se >> pure ()
 	addChat barejid sendMsg
+	add <- liftIO $ readTVarIO $ addMUCToRosterWindow s
+	liftIO $ add barejid
 #endif
 	historyRequestSeconds <- readVarH (readTVarIO . muc_history_request)
 	let historyRequest = if historyRequestSeconds < 0 then Nothing else Just $ def { mhrSeconds = Just historyRequestSeconds }
 	liftIO $ joinMUC jid historyRequest se
 	addMUC barejid nick
-	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "Voker57: i hate you") { messageType = GroupChat }) se
-	--liftIO $ sendMUC (toBare jid) "i hate you" se
-	--let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just "dosmot")
 	return $ muc barejid
-	--throw $ ENotImplemented "mucmkdir"
 
 mucsDir :: NineFile Hate
 mucsDir = (boringDir "mucs" []) {
@@ -318,6 +318,12 @@ streamManagementPlugin = do
 		, onSessionUp = const $ return ()
 		})
 
+rosterHandler :: Roster -> RosterUpdate -> IO ()
+rosterHandler roster update = do
+	print "got roster"
+	print roster
+	print update
+
 rootmkdir "roster" = do
 		s <- ask
 		serv <- readSVar $ server s
@@ -335,8 +341,8 @@ rootmkdir "roster" = do
 								then xmppDefaultParams { clientHooks = def { onServerCertificate = \_ _ _ _ -> pure [] } }
 								else xmppDefaultParams
 						},
-						enableRoster = False,
 						plugins = [sMP],
+						onRosterPush = Just rosterHandler,
 						onConnectionClosed = \sess why -> do
 							noticeM "HateXMPP" $ "Disconnected (" ++ show why ++ "). Reconnecting..."
 							_ <- reconnect' sess
@@ -345,7 +351,16 @@ rootmkdir "roster" = do
 								rejoinMUCs
 							return ()
 					}))
+#ifdef UI_GTK
+		GR.spawnRosterWindow
+#endif
 		connectS tsess
+#ifdef UI_GTK
+		-- submit the initial roster data to GUI
+		add <- liftIO $ readTVarIO $ addUserToRosterWindow s
+		roster <- liftIO $ getRoster tsess
+		liftIO $ mapM_ add $ M.keys $ items roster
+#endif
 		return rosterDir
 
 rootmkdir "test" = do

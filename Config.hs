@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, TypeFamilies, FlexibleContexts, NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, TypeFamilies, FlexibleContexts, NoMonomorphismRestriction, CPP #-}
 
 module Config where
 
@@ -88,6 +88,10 @@ initState = do
 	logst <- newTVarIO MS.empty
 	mucst <- newTVarIO MS.empty
 	chatst <- newTVarIO MS.empty
+#ifdef UI_GTK
+	amt <- newTVarIO undefined
+	aut <- newTVarIO undefined
+#endif
 
 	return $ GlobalState
 		{ server = st
@@ -110,4 +114,6 @@ initState = do
 		, logs = logst
 		, mucs = mucst
 		, chats = chatst
+		, addMUCToRosterWindow = amt
+		, addUserToRosterWindow = aut
 		}

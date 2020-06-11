@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, TypeFamilies, FlexibleContexts, CPP #-}
 
 module Types where
 
@@ -62,4 +62,8 @@ data GlobalState = GlobalState
 	, logs :: TVar Logs
 	, mucs :: TVar MUCs
 	, chats :: TVar (MS.Map Jid (LogEntry -> IO ()))
+#ifdef UI_GTK
+	, addMUCToRosterWindow :: TVar (Jid -> IO ())
+	, addUserToRosterWindow :: TVar (Jid -> IO ())
+#endif
 	}
