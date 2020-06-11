@@ -172,7 +172,7 @@ mucsmkdir name = do
 	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ T.pack nick)
 #ifdef UI_GTK
 	-- TODO error reporting
-	let sendMsg text = (S.putStrLn text) >> (sendMessage ((simpleIM barejid text) { messageType = GroupChat }) se) >> (pure ())
+	let sendMsg text = sendMessage ((simpleIM barejid text) { messageType = GroupChat }) se >> pure ()
 	addChat barejid sendMsg
 #endif
 	-- TODO clear idea about how much of the history to request

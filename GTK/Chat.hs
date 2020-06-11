@@ -82,7 +82,6 @@ bufferAdd tb s = do
 inputKeyPressed inputb message_cb e = if (eventKeyName e == "Return") && (notElem Shift $ eventModifier e)
 	then do	
 		t <- bufferGet inputb
-		TIO.putStrLn t
 		message_cb t
 		textBufferSetText inputb ("" :: Text)
 		return True
