@@ -113,6 +113,8 @@ initState = do
 		, logs = logst
 		, mucs = mucst
 		, chats = chatst
+#ifdef UI_GTK
 		, addMUCToRosterWindow = amt
 		, addUserToRosterWindow = aut
+#endif
 		}
