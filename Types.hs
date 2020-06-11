@@ -40,24 +40,25 @@ data MUC = MUC
 	{ nick :: String
 	} deriving Show
 
-data GlobalState = GlobalState {
-		server :: TVar String,
-		port :: TVar String,
-		username :: TVar Text,
-		password :: TVar Text,
-		resource :: TVar Text,
-		priority :: TVar String,
-		jiv_name :: TVar String,
-		jiv_os :: TVar String,
-		jiv_version :: TVar String,
-		muc_default_nick :: TVar String,
-		showst :: TVar ShowSt,
-		status :: TVar String,
-		streamManagement :: TVar Bool,
-		permitUnsafeCerts :: TVar Bool,
+data GlobalState = GlobalState
+	{ server :: TVar String
+	, port :: TVar String
+	, username :: TVar Text
+	, password :: TVar Text
+	, resource :: TVar Text
+	, priority :: TVar String
+	, jiv_name :: TVar String
+	, jiv_os :: TVar String
+	, jiv_version :: TVar String
+	, muc_default_nick :: TVar String
+	, showst :: TVar ShowSt
+	, status :: TVar String
+	, streamManagement :: TVar Bool
+	, permitUnsafeCerts :: TVar Bool
 
-		sess :: TVar Session,
-		featureStreamManagement3 :: TVar Bool,
-		logs :: TVar Logs,
-		mucs :: TVar MUCs
+	, sess :: TVar Session
+	, featureStreamManagement3 :: TVar Bool
+	, logs :: TVar Logs
+	, mucs :: TVar MUCs
+	, chats :: TVar (MS.Map Jid (LogEntry -> IO ()))
 	}

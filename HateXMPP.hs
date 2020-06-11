@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, TypeFamilies, FlexibleContexts, CPP #-}
 
 module Main where
 
@@ -22,6 +22,7 @@ import qualified Data.Map.Strict as MS
 import Data.Maybe
 import Data.String.Class (toText)
 import qualified Data.String.Class as S
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding as E
 import Data.Time
@@ -47,6 +48,10 @@ import Config
 import Log
 import MUC
 import Types
+#ifdef UI_GTK
+import GTK.GTK
+import GTK.Chat
+#endif
 
 import Debug.Trace
 
@@ -165,6 +170,11 @@ mucsmkdir name = do
 	let barejid = fromMaybe (throw EInval) $ jidFromText $ T.pack name
 	let (localp, domainp, _) = jidToTexts barejid
 	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ T.pack nick)
+#ifdef UI_GTK
+	-- TODO error reporting
+	let sendMsg text = (S.putStrLn text) >> (sendMessage ((simpleIM barejid text) { messageType = GroupChat }) se) >> (pure ())
+	addChat barejid sendMsg
+#endif
 	-- TODO clear idea about how much of the history to request
 	liftIO $ joinMUC jid (Just $ def { mhrSeconds = Just 200 }) se
 	addMUC barejid nick
@@ -203,6 +213,14 @@ processOtherFeatures s e = do
 				writeVar (featureStreamManagement3 s) True
 			_ -> return ()
 
+handleReceivedMessage from msg nick timestamp = do
+	s <- ask
+	chats <- liftIO $ readTVarIO $ chats s
+	let entry = (timestamp, nick, msg)
+	maybe (pure ()) (\handler -> liftIO $ handler entry) $ MS.lookup from $ chats
+	putLog from msg nick timestamp
+
+receiver :: GlobalState -> Session -> IO ()
 receiver s se = flip runHate s $ forever $ do
 		(stanza, ann) <- liftIO $ getStanza se
 		case stanza of
@@ -230,7 +248,7 @@ receiver s se = flip runHate s $ forever $ do
 					let saneFrom = if (typ == GroupChat)
 						then toBare f
 						else f
-					lift $ putLog saneFrom text nick timestamp
+					lift $ handleReceivedMessage saneFrom text nick timestamp
 			PresenceS p@(Presence id from to lang typ pld attr) -> do
 				if L.null pld
 					then liftIO $ dbg $ show ("simple presence", from, typ)
@@ -345,6 +363,9 @@ initMain = do
 
 	a <- getEnv "HATEXMPP_ADDRESS"
 	state <- initState
+#ifdef UI_GTK
+	initGTK
+#endif
 
 	(rootdir, rootref) <- simpleDirectory "/" (throw $ EInval) rootmkdir
 	writeIORef rootref [("config", configDir), ("mucs", mucsDir)]

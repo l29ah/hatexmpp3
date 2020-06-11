@@ -82,24 +82,26 @@ initState = do
 	featureStreamManagement3t <- newTVarIO False
 	logst <- newTVarIO MS.empty
 	mucst <- newTVarIO MS.empty
+	chatst <- newTVarIO MS.empty
 
-	return $ GlobalState {
-				server = st,
-				username = ut,
-				password = pt,
-				priority = priot,
-				port = portt,
-				resource = rt,
-				jiv_name = jnt,
-				jiv_os = jot,
-				jiv_version = jvt,
-				muc_default_nick = mdnt,
-				showst = showt,
-				status = statust,
-				streamManagement = streamManagementt,
-				permitUnsafeCerts = permitUnsafeCertst,
-				sess = sesst,
-				featureStreamManagement3 = featureStreamManagement3t,
-				logs = logst,
-				mucs = mucst
-			}
+	return $ GlobalState
+		{ server = st
+		, username = ut
+		, password = pt
+		, priority = priot
+		, port = portt
+		, resource = rt
+		, jiv_name = jnt
+		, jiv_os = jot
+		, jiv_version = jvt
+		, muc_default_nick = mdnt
+		, showst = showt
+		, status = statust
+		, streamManagement = streamManagementt
+		, permitUnsafeCerts = permitUnsafeCertst
+		, sess = sesst
+		, featureStreamManagement3 = featureStreamManagement3t
+		, logs = logst
+		, mucs = mucst
+		, chats = chatst
+		}
