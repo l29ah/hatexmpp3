@@ -79,9 +79,10 @@ dbg = debugM "HateXMPP"
 catchXmpp :: Either XmppFailure Session -> IO Session
 catchXmpp = either throw return
 
---chatFileRead :: Word64 -> Word32 -> Hate ByteString
+chatFileRead :: MessageType -> Jid -> Word64 -> Word32 -> Hate BLC.ByteString
 chatFileRead typ jid offset len = getLogLazyS jid (fromIntegral offset) (fromIntegral len)
 
+chatFileWrite :: MessageType -> Jid -> BL.ByteString -> Hate ()
 chatFileWrite typ jid text = do
 	s <- ask
 	se <- readVar $ sess s
