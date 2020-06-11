@@ -30,6 +30,9 @@ instance Configable Text where
 instance Configable Bool where
 	readcfg = Prelude.read . BLC.unpack	-- TODO
 	showcfg = BLC.pack . show
+instance Configable Integer where
+	readcfg = Prelude.read . BLC.unpack
+	showcfg = BLC.pack . show
 
 configTVarReadWith c acc = Just (liftM c . liftIO . readTVarIO . acc =<< ask)
 configTVarWriteWith c acc x = liftIO . atomically . flip writeTVar (c x) . acc =<< ask
@@ -46,6 +49,7 @@ configDir = boringDir "config" [
 		rwfc "password" password,
 		rwfc "resource" resource,
 		rwfc "muc_default_nick" muc_default_nick,
+		rwfc "muc_history_request" muc_history_request,
 		rwfc "status" status,
 		rwfc "stream_management" streamManagement,
 		rwfc "permit_all_certs" permitUnsafeCerts
@@ -78,6 +82,7 @@ initState = do
 	statust <- newTVarIO ""
 	streamManagementt <- newTVarIO False
 	permitUnsafeCertst <- newTVarIO False
+	mhrst <- newTVarIO (-1)
 	sesst <- newTVarIO undefined
 	featureStreamManagement3t <- newTVarIO False
 	logst <- newTVarIO MS.empty
@@ -99,6 +104,7 @@ initState = do
 		, status = statust
 		, streamManagement = streamManagementt
 		, permitUnsafeCerts = permitUnsafeCertst
+		, muc_history_request = mhrst
 		, sess = sesst
 		, featureStreamManagement3 = featureStreamManagement3t
 		, logs = logst

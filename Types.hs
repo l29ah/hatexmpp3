@@ -55,6 +55,7 @@ data GlobalState = GlobalState
 	, status :: TVar String
 	, streamManagement :: TVar Bool
 	, permitUnsafeCerts :: TVar Bool
+	, muc_history_request :: TVar Integer
 
 	, sess :: TVar Session
 	, featureStreamManagement3 :: TVar Bool

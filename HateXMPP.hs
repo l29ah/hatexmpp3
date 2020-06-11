@@ -175,8 +175,9 @@ mucsmkdir name = do
 	let sendMsg text = sendMessage ((simpleIM barejid text) { messageType = GroupChat }) se >> pure ()
 	addChat barejid sendMsg
 #endif
-	-- TODO clear idea about how much of the history to request
-	liftIO $ joinMUC jid (Just $ def { mhrSeconds = Just 200 }) se
+	historyRequestSeconds <- readVarH (readTVarIO . muc_history_request)
+	let historyRequest = if historyRequestSeconds < 0 then Nothing else Just $ def { mhrSeconds = Just historyRequestSeconds }
+	liftIO $ joinMUC jid historyRequest se
 	addMUC barejid nick
 	--liftIO $ sendMessage ((simpleIM ((fromJust $ jidFromTexts (Just "hikkiecommune") "conference.bitcheese.net" Nothing)) "Voker57: i hate you") { messageType = GroupChat }) se
 	--liftIO $ sendMUC (toBare jid) "i hate you" se
