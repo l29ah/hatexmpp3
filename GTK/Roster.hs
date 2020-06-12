@@ -39,9 +39,11 @@ spawnRosterWindow = do
 		MView.treeViewColumnPackStart column cell True
 		cellLayoutSetAttributes column cell store (\record -> [MView.cellText := record])
 
-		-- TODO scroll
+		scroll <- scrolledWindowNew Nothing Nothing
+		scrolledWindowSetPolicy scroll PolicyAutomatic PolicyAutomatic
+		containerAdd scroll view
 
-		containerAdd w view
+		containerAdd w scroll
 		widgetShowAll w
 		pure (\index jid -> postGUISync $ do
 			let path = [index]
