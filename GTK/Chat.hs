@@ -57,14 +57,17 @@ addChat jid message_cb = do
 		widgetShowAll w
 		Rectangle _ _ _ height <- widgetGetAllocation panels
 		panedSetPosition panels (round (0.9 * fromIntegral height))
+
+		-- wait for the widgets to pop up to catch the upcoming messages
+		whileM_ (fmap (> 0) eventsPending) $ mainIterationDo False
 	
-		pure (\entry -> do
-			postGUISync $ bufferAdd logb $ renderMessage entry
+		pure (\entry -> postGUISync $ do
+			bufferAdd logb $ renderMessage entry
 			-- wait for the buffer to draw // https://stackoverflow.com/a/40917718/4095104
-			postGUISync $ whileM_ (fmap (> 0) eventsPending) $ mainIterationDo False
+			whileM_ (fmap (> 0) eventsPending) $ mainIterationDo False
 			-- scroll the log to the newly received message
-			ei <- postGUISync $ textBufferGetEndIter logb
-			postGUISync $ textViewScrollToIter logv ei 0 $ Just (1, 1)
+			ei <- textBufferGetEndIter logb
+			textViewScrollToIter logv ei 0 $ Just (1, 1)
 			pure ()
 			)
 	s <- ask

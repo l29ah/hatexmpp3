@@ -204,11 +204,17 @@ processOtherFeatures _ e = do
 				writeVar (featureStreamManagement3 s) True
 			_ -> return ()
 
-handleReceivedMessage from msg nick timestamp = do
+handleReceivedMessage se from msg nick timestamp = do
 	s <- ask
-	chats <- liftIO $ readTVarIO $ chats s
 	let entry = (timestamp, nick, msg)
-	maybe (pure ()) (\handler -> liftIO $ handler entry) $ MS.lookup from $ chats
+#ifdef UI_GTK
+	chatHandlers <- liftIO $ readTVarIO $ chats s
+	let maybeChatWindow = MS.lookup from $ chatHandlers
+	let sendMsg text = sendMessage ((simpleIM from text) { messageType = Chat }) se >> pure ()
+	when (isNothing maybeChatWindow) $ addChat from sendMsg
+	chatHandlers <- liftIO $ readTVarIO $ chats s
+	maybe (pure ()) (\handler -> liftIO $ handler entry) $ MS.lookup from $ chatHandlers
+#endif
 	putLog from msg nick timestamp
 
 receiver :: GlobalState -> Session -> IO ()
@@ -239,7 +245,7 @@ receiver s se = flip runHate s $ forever $ do
 					let saneFrom = if (typ == GroupChat)
 						then toBare f
 						else f
-					lift $ handleReceivedMessage saneFrom text nick timestamp
+					lift $ handleReceivedMessage se saneFrom text nick timestamp
 			PresenceS p@(Presence id from to lang typ pld attr) -> do
 				if L.null pld
 					then liftIO $ dbg $ show ("simple presence", from, typ)
