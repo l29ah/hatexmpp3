@@ -28,6 +28,7 @@ import Network.NineP.Error
 import Network.NineP.File
 import Network.TLS
 import Network.Xmpp
+import Network.Xmpp.Extras.DateTime
 import Network.Xmpp.Extras.IQAvatar
 import Network.Xmpp.Extras.MUC
 import Network.Xmpp.Extras.VCardAvatar
@@ -237,7 +238,7 @@ receiver s se = flip runHate s $ forever $ do
 						t <- case content of
 							ContentText t -> pure t
 							_ -> mzero
-						parseTimeM False defaultTimeLocale "%Y-%m-%dT%H:%M:%SZ" $ T.unpack t :: Maybe UTCTime
+						fromDateTime $ T.unpack t :: Maybe UTCTime
 					let timestamp = fromMaybe now delayed_ts
 					let nick = if (typ == GroupChat)
 						then resourcepart f
