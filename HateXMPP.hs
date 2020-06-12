@@ -88,7 +88,7 @@ chatFileWrite typ jid text = do
 	s <- ask
 	se <- readVar $ sess s
 	liftIO $ do
-		result <- sendMessage ((simpleIM jid $ toText text) { messageType = typ }) se
+		result <- sendMsg se typ jid $ toText text
 		return $ either (throw . OtherError . show) (id) result
 
 chatFile jid = --simpleFile (T.unpack $ jidToText jid)
@@ -165,8 +165,8 @@ mucsmkdir name = do
 	let jid = fromMaybe (throw EInval) $ jidFromTexts localp domainp (Just $ T.pack nick)
 #ifdef UI_GTK
 	-- TODO error reporting
-	let sendMsg text = sendMessage ((simpleIM barejid text) { messageType = GroupChat }) se >> pure ()
-	addChat barejid sendMsg
+	let send text = sendMsg se GroupChat barejid text >> pure ()
+	addChat barejid send
 	add <- liftIO $ readTVarIO $ addMUCToRosterWindow s
 	liftIO $ add barejid
 #endif
@@ -192,6 +192,10 @@ mucsDir = (boringDir "mucs" []) {
 		create = \name perms -> if isDir perms then mucsmkdir name else throw EInval
 	}
 
+sendMsg se typ jid text = sendMessage ((simpleIM jid text) { messageType = typ }) se
+-- TODO error handling
+sendMsg_ se typ jid text = sendMsg se typ jid text >> pure ()
+
 sendRaw :: B.ByteString -> Session -> IO (Either XmppFailure ())
 sendRaw d s = semWrite (writeSemaphore s) d
 
@@ -211,8 +215,8 @@ handleReceivedMessage se from msg nick timestamp = do
 #ifdef UI_GTK
 	chatHandlers <- liftIO $ readTVarIO $ chats s
 	let maybeChatWindow = MS.lookup from $ chatHandlers
-	let sendMsg text = sendMessage ((simpleIM from text) { messageType = Chat }) se >> pure ()
-	when (isNothing maybeChatWindow) $ addChat from sendMsg
+	let send text = sendMsg se Chat from text >> pure ()
+	when (isNothing maybeChatWindow) $ addChat from send
 	chatHandlers <- liftIO $ readTVarIO $ chats s
 	maybe (pure ()) (\handler -> liftIO $ handler entry) $ MS.lookup from $ chatHandlers
 #endif
@@ -349,7 +353,7 @@ rootmkdir "roster" = do
 							return ()
 					}))
 #ifdef UI_GTK
-		GR.spawnRosterWindow
+		GR.spawnRosterWindow $ sendMsg_ tsess
 #endif
 		connectS tsess
 #ifdef UI_GTK
