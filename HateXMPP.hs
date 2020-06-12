@@ -241,7 +241,7 @@ receiver s se = flip runHate s $ forever $ do
 					let timestamp = fromMaybe now delayed_ts
 					let nick = if (typ == GroupChat)
 						then resourcepart f
-						else Nothing
+						else maybe (Just $ domainpart f) Just $ localpart f	-- TODO use nickname from roster
 					let saneFrom = if (typ == GroupChat)
 						then toBare f
 						else f
