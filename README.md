@@ -7,3 +7,5 @@ hatexmpp3 is just another attempt at a filesystem-interfaced XMPP client.
 * XEP-0198: Stream Management
 	* acknowledges stanzas
 	* doesn't resume interrupted streams
+* XEP-0203: Delayed Delivery
+	* interprets timestamps of delayed incoming messages
