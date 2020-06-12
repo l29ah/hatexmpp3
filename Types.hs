@@ -19,6 +19,7 @@ type Msg = Text
 type LogEntry = (UTCTime, Maybe Nickname, Msg)
 type Logs = MS.Map Jid Log
 type MUCs = MS.Map Jid MUC
+type ChatHandler = LogEntry -> IO ()
 
 data Log = Log
 	{ logEntries :: TVar (Seq LogEntry)
@@ -60,7 +61,7 @@ data GlobalState = GlobalState
 	, featureStreamManagement3 :: TVar Bool
 	, logs :: TVar Logs
 	, mucs :: TVar MUCs
-	, chats :: TVar (MS.Map Jid (LogEntry -> IO ()))
+	, chats :: TVar (MS.Map Jid ChatHandler)
 #ifdef UI_GTK
 	, addMUCToRosterWindow :: TVar (Jid -> IO ())
 	, addUserToRosterWindow :: TVar (Jid -> IO ())

@@ -27,12 +27,20 @@ renderMessage (t, mn, m) = T.concat
 		, m
 		]
 
+delChat :: TVar (M.Map Jid ChatHandler) -> Jid -> IO ()
+delChat chatv jid = do
+	atomically $ modifyTVar' chatv $ M.delete jid
+
 addChat :: Jid -> (Msg -> IO ()) -> Hate ()
 addChat jid message_cb = do
+	s <- ask
 	handler <- liftIO $ postGUISync $ do
 		w <- windowNew
 		set w [windowTitle := jidToText jid]
 		windowSetDefaultSize w 500 500
+		on w deleteEvent $ liftIO $ do
+			delChat (chats s) jid
+			pure False
 
 		logb <- textBufferNew Nothing
 		logv <- textViewNewWithBuffer logb
@@ -70,7 +78,6 @@ addChat jid message_cb = do
 			textViewScrollToIter logv ei 0 $ Just (1, 1)
 			pure ()
 			)
-	s <- ask
 	liftIO $ atomically $ modifyTVar (chats s) $ M.insert jid handler
 
 bufferGet :: TextBuffer -> IO Text
