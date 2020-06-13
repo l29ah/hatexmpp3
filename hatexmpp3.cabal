@@ -20,6 +20,7 @@ Source-repository this
   tag:               0
 
 flag gtk
+        description: Enable GTK interface
         default: True
         manual: True
 
