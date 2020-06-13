@@ -213,12 +213,18 @@ handleReceivedMessage se from msg nick timestamp = do
 	s <- ask
 	let entry = (timestamp, nick, msg)
 #ifdef UI_GTK
+	-- reply to a jid, not to jid/resource, and keep all the /resources communications in one chat window
+	let bareFrom = toBare from
+
+	-- create a new chat window when it's not present
 	chatHandlers <- liftIO $ readTVarIO $ chats s
-	let maybeChatWindow = MS.lookup from $ chatHandlers
-	let send text = sendMsg se Chat from text >> pure ()
-	when (isNothing maybeChatWindow) $ addChat from send
+	let maybeChatWindow = MS.lookup bareFrom $ chatHandlers
+	let send text = sendMsg se Chat bareFrom text >> pure ()
+	when (isNothing maybeChatWindow) $ addChat bareFrom send
+
+	-- push the message into the chat window
 	chatHandlers <- liftIO $ readTVarIO $ chats s
-	maybe (pure ()) (\handler -> liftIO $ handler entry) $ MS.lookup from $ chatHandlers
+	maybe (pure ()) (\handler -> liftIO $ handler entry) $ MS.lookup bareFrom $ chatHandlers
 #endif
 	putLog from msg nick timestamp
 
