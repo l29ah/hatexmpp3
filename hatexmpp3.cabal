@@ -1,10 +1,23 @@
+Cabal-Version:  2.0
 Name:           hatexmpp3
 Version:        0
+Category:       Network
+Synopsis:       XMPP client with 9P and (optionally) GTK interfaces
+author:         Sergey Alirzaev
+Maintainer:     zl29ah@gmail.com
 License:        OtherLicense
 License-file:   LICENSE
 Build-Type:     Simple
-Cabal-Version:  >= 2.0
 Tested-With:    GHC == 8.6.5
+
+Source-repository head
+  type:              git
+  location:          https://github.com/l29ah/hatexmpp3
+
+Source-repository this
+  type:              git
+  location:          https://github.com/l29ah/hatexmpp3
+  tag:               0
 
 flag gtk
         default: True
@@ -15,6 +28,11 @@ Executable      hatexmpp
         other-modules:
                         Types
                         Config
+                        Log
+                        MUC
+                        TByteVector
+                        Network.Xmpp.Extras.IQAvatar
+                        Network.Xmpp.Extras.VCardAvatar
         ghc-options:    -W -fno-warn-tabs -threaded
         default-language: Haskell2010
         Build-depends:
@@ -42,3 +60,7 @@ Executable      hatexmpp
                         gtk3 ^>= 0.14,
                         datetime ^>= 0.3.1,
                         monad-loops ^>= 0.4.3
+                other-modules:
+                        GTK.Chat
+                        GTK.GTK
+                        GTK.Roster
